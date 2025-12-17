@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelSlicer - Online Sprite Cutter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1a1b26; color: #a9b1d6; font-family: 'Segoe UI', sans-serif; }
+        .canvas-bg { 
+            background-image: 
+                linear-gradient(45deg, #2b2d42 25%, transparent 25%), 
+                linear-gradient(-45deg, #2b2d42 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #2b2d42 75%), 
+                linear-gradient(-45deg, transparent 75%, #2b2d42 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        input[type=range] {
+            accent-color: #7aa2f7;
+        }
+        .frame-wrapper:hover .frame-overlay {
+            opacity: 1;
+        }
+        /* Pasif kare stili */
+        .frame-disabled img {
+            opacity: 0.3;
+            filter: grayscale(100%);
+        }
+        .frame-disabled {
+            border-color: #f43f5e !important; /* Kırmızı çerçeve */
+        }
+        
+        /* Canvas Zoom Geçişi */
+        #mainCanvas, #previewCanvas {
+            transition: width 0.1s ease-out, height 0.1s ease-out; /* Daha hızlı tepki için 0.1s */
+        }
+        
+        /* Kaydırma Çubuğunu Gizle */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Üst Bar -->
+    <header class="bg-[#16161e] border-b border-[#414868] p-4 flex justify-between items-center shadow-lg z-10">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-layer-group text-3xl text-[#7aa2f7]"></i>
+            <div>
+                <h1 class="text-xl font-bold text-white tracking-wide">Pixel<span class="text-[#7aa2f7]">Slicer</span></h1>
+                <p class="text-[10px] text-gray-400 font-mono tracking-wider">ONLINE SPRITE CUTTER</p>
+            </div>
+        </div>
+        <div class="flex gap-4">
+            <label class="cursor-pointer bg-[#7aa2f7] hover:bg-[#3d59a1] text-white px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2 shadow-lg shadow-blue-900/20">
+                <i class="fa-solid fa-upload"></i> Resim Yükle
+                <input type="file" id="uploadInput" accept="image/*" class="hidden">
+            </label>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sol Panel: Ayarlar -->
+        <aside class="w-80 bg-[#1f2335] border-r border-[#414868] p-4 overflow-y-auto no-scrollbar flex flex-col gap-3 shadow-xl z-20">
+            
+            <!-- Manuel Mod Paneli -->
+            <div class="bg-[#292e42] p-3 rounded-lg border border-[#414868] mb-2">
+                <h3 class="text-xs font-bold text-[#bb9af7] mb-2 uppercase flex items-center gap-2">
+                    <i class="fa-solid fa-pen-nib"></i> Manuel Seçim
+                </h3>
+                <div class="flex flex-col gap-2">
+                    <button id="toggleManualModeBtn" class="w-full py-2 px-3 rounded text-sm font-bold transition flex items-center justify-center gap-2 bg-[#16161e] border border-[#414868] text-gray-400 hover:text-white">
+                        <i class="fa-regular fa-square"></i> <span>Manuel Ekle: KAPALI</span>
+                    </button>
+                    <p class="text-[10px] text-gray-400 leading-tight">
+                        Açıkken sürükleyerek kare çizin. Seçili kareyi köşelerinden <span class="text-[#7aa2f7]">boyutlandırabilirsiniz.</span>
+                    </p>
+                     <button id="clearManualBtn" class="w-full py-1 px-2 rounded text-xs transition bg-[#f43f5e]/20 text-[#f43f5e] hover:bg-[#f43f5e] hover:text-white border border-[#f43f5e]/50 hidden">
+                        Tüm Manuel Kareleri Sil
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid Ayarları -->
+            <div class="space-y-3">
+                <h3 class="text-white font-semibold border-b border-[#414868] pb-1">
+                    <i class="fa-solid fa-table-cells text-[#bb9af7]"></i> Izgara (Grid) Ayarları
+                </h3>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-bold uppercase text-[#565f89]">Sütun (Yatay)</label>
+                        <input type="number" id="colsInput" value="4" min="1" class="w-full bg-[#16161e] border border-[#414868] rounded p-2 text-white focus:border-[#7aa2f7] outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold uppercase text-[#565f89]">Satır (Dikey)</label>
+                        <input type="number" id="rowsInput" value="2" min="1" class="w-full bg-[#16161e] border border-[#414868] rounded p-2 text-white focus:border-[#7aa2f7] outline-none">
+                    </div>
+                </div>
+
+                <!-- İnce Ayar -->
+                <div class="bg-[#292e42] p-3 rounded-lg border border-[#414868]">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="text-xs font-bold text-[#e0af68] uppercase"><i class="fa-solid fa-ruler-combined"></i> İnce Ayar</h4>
+                        <button id="resetFineTuneBtn" class="text-[10px] bg-[#1f2335] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white px-2 py-1 rounded transition flex items-center gap-1" title="Ayarları Sıfırla">
+                            <i class="fa-solid fa-rotate-left"></i> Sıfırla
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Yatay Kaydır (Offset X)</span>
+                                <span id="offsetXVal" class="text-[#7aa2f7]">0px</span>
+                            </div>
+                            <input type="range" id="offsetXRange" min="-100" max="100" value="0" class="w-full h-1 bg-[#414868] rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Dikey Kaydır (Offset Y)</span>
+                                <span id="offsetYVal" class="text-[#7aa2f7]">0px</span>
+                            </div>
+                            <input type="range" id="offsetYRange" min="-100" max="100" value="0" class="w-full h-1 bg-[#414868] rounded-lg appearance-none cursor-pointer">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Genişlik Düzeltme (Padding)</span>
+                                <span id="paddingVal" class="text-[#7aa2f7]">0px</span>
+                            </div>
+                            <input type="range" id="paddingRange" min="-50" max="50" value="0" class="w-full h-1 bg-[#414868] rounded-lg appearance-none cursor-pointer">
+                            <p class="text-[10px] text-gray-400 mt-1">Kılıç sığmıyorsa bunu arttır.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Animasyon Önizleme -->
+            <div class="space-y-3 flex-1 flex flex-col min-h-0">
+                <h3 class="text-white font-semibold border-b border-[#414868] pb-1 flex justify-between items-center">
+                    <span><i class="fa-solid fa-play text-[#9ece6a]"></i> Önizleme</span>
+                    <span id="prevZoomDisplay" class="text-[10px] text-gray-400 font-mono">Otomatik</span>
+                </h3>
+                
+                <div class="flex flex-col gap-2 flex-1 min-h-0">
+                    <div id="previewContainer" class="flex justify-center bg-[#16161e] p-2 rounded border border-[#414868] canvas-bg h-full min-h-[120px] overflow-hidden items-center relative">
+                        <canvas id="previewCanvas" class="max-w-full max-h-full object-contain"></canvas>
+                        <div id="noActiveFramesMsg" class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs text-center hidden p-2">
+                            Tüm kareler devre dışı.
+                        </div>
+                    </div>
+                    
+                    <!-- Önizleme Zoom Kontrolleri -->
+                    <div class="flex justify-center gap-2 shrink-0">
+                        <button id="prevZoomOut" class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white px-2 py-1 rounded text-xs transition"><i class="fa-solid fa-minus"></i></button>
+                        <button id="prevFit" class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white px-3 py-1 rounded text-xs font-bold transition">SIĞDIR</button>
+                        <button id="prevZoomIn" class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white px-2 py-1 rounded text-xs transition"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+                
+                <div class="shrink-0">
+                    <label class="text-xs font-bold uppercase text-[#565f89]">Hız (FPS)</label>
+                    <input type="range" id="fpsRange" min="1" max="60" value="8" class="w-full h-1 bg-[#414868] rounded-lg appearance-none cursor-pointer mt-2">
+                    <div class="text-center text-xs text-[#7aa2f7] mt-1"><span id="fpsVal">8</span> FPS</div>
+                </div>
+            </div>
+
+            <button id="downloadAllBtn" class="w-full bg-[#bb9af7] hover:bg-[#9d7cd8] text-[#1a1b26] font-bold py-3 rounded-lg transition mt-auto shrink-0 flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20">
+                <i class="fa-solid fa-file-zipper"></i> ZIP Olarak İndir
+            </button>
+
+        </aside>
+
+        <!-- Orta Panel: Editör -->
+        <main class="flex-1 bg-[#16161e] overflow-hidden relative flex flex-col">
+            
+            <!-- Resim Editörü (Canvas Container) -->
+            <!-- DÜZELTME: justify-center ve items-center kaldırıldı, flex ve overflow-auto korundu -->
+            <div id="canvasContainer" class="flex-1 overflow-auto relative bg-[#101014] flex p-10">
+                
+                <!-- Zoom Kontrolleri -->
+                <div class="fixed top-20 right-8 flex gap-2 z-30 bg-[#1f2335]/90 backdrop-blur p-2 rounded-lg border border-[#414868] shadow-lg select-none sticky-controls">
+                    <button id="zoomOutBtn" class="w-8 h-8 flex items-center justify-center hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white rounded transition" title="Küçült"><i class="fa-solid fa-minus"></i></button>
+                    <span id="zoomLevelDisplay" class="text-xs font-mono font-bold flex items-center justify-center w-12 text-white">100%</span>
+                    <button id="zoomInBtn" class="w-8 h-8 flex items-center justify-center hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white rounded transition" title="Büyüt"><i class="fa-solid fa-plus"></i></button>
+                    <div class="w-px bg-[#414868] mx-1"></div>
+                    <button id="fitBtn" class="h-8 px-3 flex items-center justify-center hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white rounded transition text-xs font-bold gap-2" title="Ekrana Sığdır">
+                        <i class="fa-solid fa-compress"></i> Sığdır
+                    </button>
+                </div>
+
+                <!-- Canvas Wrapper -->
+                <!-- DÜZELTME: m-auto eklendi (Otomatik ortalama ve scroll sağlama için) -->
+                <div class="relative shadow-2xl border-2 border-[#414868] canvas-bg min-w-[500px] min-h-[400px] m-auto group">
+                    <canvas id="mainCanvas" class="max-w-none block"></canvas>
+                    
+                    <div id="canvasHoverInfo" class="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded pointer-events-none hidden group-hover:block z-40">
+                        Seçmek/kapatmak için tıklayın. Manuel modda çizim yapın.
+                    </div>
+
+                    <div id="welcomeText" class="absolute inset-0 flex flex-col items-center justify-center bg-[#16161e]/90 text-center p-6 z-10">
+                        <i class="fa-solid fa-cloud-arrow-up text-6xl text-[#414868] mb-4"></i>
+                        <h2 class="text-2xl font-bold text-white mb-2">Resim Yükleyin</h2>
+                        <p class="text-gray-400">Başlamak için sol üstteki butonu kullanın veya sürükleyip bırakın.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alt Galeri -->
+            <div id="framesGallery" class="h-40 bg-[#1f2335] border-t border-[#414868] p-4 flex gap-4 overflow-x-auto items-center shrink-0">
+                <p class="text-sm text-gray-500 w-full text-center">Henüz kare oluşturulmadı.</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- Elements ---
+        const uploadInput = document.getElementById('uploadInput');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const ctx = mainCanvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const pCtx = previewCanvas.getContext('2d');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const welcomeText = document.getElementById('welcomeText');
+        const noActiveFramesMsg = document.getElementById('noActiveFramesMsg');
+        const canvasHoverInfo = document.getElementById('canvasHoverInfo');
+        
+        // Inputs & Buttons
+        const colsInput = document.getElementById('colsInput');
+        const rowsInput = document.getElementById('rowsInput');
+        const offsetXRange = document.getElementById('offsetXRange');
+        const offsetYRange = document.getElementById('offsetYRange');
+        const paddingRange = document.getElementById('paddingRange');
+        const fpsRange = document.getElementById('fpsRange');
+        const resetFineTuneBtn = document.getElementById('resetFineTuneBtn');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        const toggleManualModeBtn = document.getElementById('toggleManualModeBtn');
+        const clearManualBtn = document.getElementById('clearManualBtn');
+        
+        // Display Values
+        const offsetXVal = document.getElementById('offsetXVal');
+        const offsetYVal = document.getElementById('offsetYVal');
+        const paddingVal = document.getElementById('paddingVal');
+        const fpsVal = document.getElementById('fpsVal');
+        const zoomDisplay = document.getElementById('zoomLevelDisplay');
+        const prevZoomDisplay = document.getElementById('prevZoomDisplay');
+
+        // --- State ---
+        let image = new Image();
+        let isImageLoaded = false;
+        let frames = []; 
+        let manualFrames = []; 
+        let currentFrame = 0;
+        let animationInterval;
+        let zoom = 1;
+        let previewZoom = -1;
+        
+        // Manual Mode & Resize State
+        let isManualMode = false;
+        let isDrawing = false;
+        let isResizing = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let dragRect = null; 
+        
+        let selectedManualFrameIndex = -1; // Hangi manuel kare seçili?
+        let resizeHandle = null; // 'tl', 'tr', 'bl', 'br'
+        let initialFrameState = null; // Resize başlangıç durumu
+
+        // --- Event Listeners ---
+        uploadInput.addEventListener('change', handleImageUpload);
+        
+        [colsInput, rowsInput, offsetXRange, offsetYRange, paddingRange].forEach(input => {
+            input.addEventListener('input', update);
+        });
+
+        resetFineTuneBtn.addEventListener('click', () => {
+            offsetXRange.value = 0;
+            offsetYRange.value = 0;
+            paddingRange.value = 0;
+            update();
+        });
+
+        fpsRange.addEventListener('input', () => {
+            fpsVal.innerText = fpsRange.value;
+            startAnimation();
+        });
+
+        // --- Manual Mode Listeners ---
+        toggleManualModeBtn.addEventListener('click', () => {
+            isManualMode = !isManualMode;
+            selectedManualFrameIndex = -1; // Mod değişince seçimi sıfırla
+            if(isManualMode) {
+                toggleManualModeBtn.classList.replace('bg-[#16161e]', 'bg-[#7aa2f7]');
+                toggleManualModeBtn.classList.replace('text-gray-400', 'text-[#1a1b26]');
+                toggleManualModeBtn.innerHTML = '<i class="fa-solid fa-pen-nib"></i> <span>Manuel Ekle: AÇIK</span>';
+                mainCanvas.style.cursor = 'crosshair';
+            } else {
+                toggleManualModeBtn.classList.replace('bg-[#7aa2f7]', 'bg-[#16161e]');
+                toggleManualModeBtn.classList.replace('text-[#1a1b26]', 'text-gray-400');
+                toggleManualModeBtn.innerHTML = '<i class="fa-regular fa-square"></i> <span>Manuel Ekle: KAPALI</span>';
+                mainCanvas.style.cursor = 'default';
+            }
+            redrawCanvas(); 
+            updateGallery();
+            startAnimation();
+        });
+
+        clearManualBtn.addEventListener('click', () => {
+            if(confirm("Tüm elle çizilen kareler silinecek. Emin misiniz?")) {
+                manualFrames = [];
+                selectedManualFrameIndex = -1;
+                update();
+                checkManualFramesBtn();
+            }
+        });
+
+        // --- Canvas Interactions (Click, Draw, Resize) ---
+        
+        // 1. Mouse Down
+        mainCanvas.addEventListener('mousedown', (e) => {
+            if (!isImageLoaded || !isManualMode || e.button !== 0) return; 
+            
+            const pos = getCanvasCoordinates(e);
+
+            // Önce: Resize tutamacı üzerinde miyiz?
+            if (selectedManualFrameIndex !== -1) {
+                const handle = getResizeHandle(pos, manualFrames[selectedManualFrameIndex]);
+                if (handle) {
+                    isResizing = true;
+                    resizeHandle = handle;
+                    initialFrameState = { ...manualFrames[selectedManualFrameIndex] };
+                    dragStartX = pos.x;
+                    dragStartY = pos.y;
+                    return; // Resize başlattık, çizim yapma
+                }
+            }
+
+            // Sonra: Mevcut bir manuel kareye mi tıkladık? (Seçim için)
+            let clickedFrameIndex = -1;
+            for (let i = manualFrames.length - 1; i >= 0; i--) {
+                const f = manualFrames[i];
+                if (pos.x >= f.x && pos.x <= f.x + f.w && pos.y >= f.y && pos.y <= f.y + f.h) {
+                    clickedFrameIndex = i;
+                    break;
+                }
+            }
+
+            if (clickedFrameIndex !== -1) {
+                selectedManualFrameIndex = clickedFrameIndex;
+                redrawCanvas(); // Seçimi göster
+                // Belki taşıma eklenebilir buraya ama şimdilik sadece seçim
+                return;
+            } else {
+                // Boşa tıkladıysak seçimi kaldır
+                selectedManualFrameIndex = -1;
+            }
+
+            // Hiçbiri değilse: Yeni Çizim Başlat
+            isDrawing = true;
+            dragStartX = pos.x;
+            dragStartY = pos.y;
+            dragRect = { x: pos.x, y: pos.y, w: 0, h: 0 };
+            redrawCanvas();
+        });
+
+        // 2. Mouse Move
+        window.addEventListener('mousemove', (e) => { // Window dinliyoruz ki canvas dışına çıkarsa kopmasın
+            if (!isImageLoaded) return;
+            
+            // Eğer canvas üzerinde değilsek ve çizim/resize yoksa çık
+            // Ama çizim varsa hesaplamaya devam et
+            if (!isDrawing && !isResizing && e.target !== mainCanvas) return;
+
+            const pos = getCanvasCoordinates(e); // Canvas içi koordinat
+
+            if (isResizing && selectedManualFrameIndex !== -1) {
+                // Resize işlemi
+                const frame = manualFrames[selectedManualFrameIndex];
+                const dx = pos.x - dragStartX;
+                const dy = pos.y - dragStartY;
+
+                // Handle'a göre güncelle
+                if (resizeHandle.includes('l')) {
+                    frame.x = initialFrameState.x + dx;
+                    frame.w = initialFrameState.w - dx;
+                }
+                if (resizeHandle.includes('r')) {
+                    frame.w = initialFrameState.w + dx;
+                }
+                if (resizeHandle.includes('t')) {
+                    frame.y = initialFrameState.y + dy;
+                    frame.h = initialFrameState.h - dy;
+                }
+                if (resizeHandle.includes('b')) {
+                    frame.h = initialFrameState.h + dy;
+                }
+
+                // Negatif genişlik/yükseklik koruması
+                if (frame.w < 5) frame.w = 5;
+                if (frame.h < 5) frame.h = 5;
+
+                update(); // Güncelle (bu redraw yapar)
+                
+            } else if (isDrawing && isManualMode) {
+                // Çizim işlemi
+                dragRect.w = pos.x - dragStartX;
+                dragRect.h = pos.y - dragStartY;
+                redrawCanvas();
+            } else if (isManualMode && selectedManualFrameIndex !== -1) {
+                // Cursor güncelleme (Handle üzerinde mi?)
+                // Bunu sadece canvas üzerinde yap
+                if(e.target === mainCanvas) {
+                    const handle = getResizeHandle(pos, manualFrames[selectedManualFrameIndex]);
+                    if (handle) {
+                        mainCanvas.style.cursor = (handle === 'tl' || handle === 'br') ? 'nwse-resize' : 'nesw-resize';
+                    } else {
+                        mainCanvas.style.cursor = 'crosshair';
+                    }
+                }
+            }
+        });
+
+        // 3. Mouse Up
+        window.addEventListener('mouseup', (e) => {
+            if (isResizing) {
+                isResizing = false;
+                resizeHandle = null;
+                // Genişlik/Yükseklik negatif kalmışsa düzelt
+                const f = manualFrames[selectedManualFrameIndex];
+                if(f.w < 0) { f.x += f.w; f.w = Math.abs(f.w); }
+                if(f.h < 0) { f.y += f.h; f.h = Math.abs(f.h); }
+                update();
+            }
+
+            if (isDrawing && isManualMode) {
+                isDrawing = false;
+                
+                let finalX = dragRect.w < 0 ? dragStartX + dragRect.w : dragStartX;
+                let finalY = dragRect.h < 0 ? dragStartY + dragRect.h : dragStartY;
+                let finalW = Math.abs(dragRect.w);
+                let finalH = Math.abs(dragRect.h);
+
+                if (finalW > 5 && finalH > 5) {
+                    manualFrames.push({
+                        x: finalX,
+                        y: finalY,
+                        w: finalW,
+                        h: finalH,
+                        active: true,
+                        isManual: true
+                    });
+                    // Yeni çizileni otomatik seç
+                    selectedManualFrameIndex = manualFrames.length - 1;
+                    checkManualFramesBtn();
+                }
+                
+                dragRect = null;
+                update(); 
+            }
+        });
+
+        // 4. Click (Toggle Active)
+        mainCanvas.addEventListener('click', (e) => {
+            if (!isImageLoaded || isManualMode) return; // Manuel modda seçim yapıyoruz, toggle değil
+            
+            const pos = getCanvasCoordinates(e);
+            
+            for (let i = frames.length - 1; i >= 0; i--) {
+                const f = frames[i];
+                if (pos.x >= f.x && pos.x <= f.x + f.w && pos.y >= f.y && pos.y <= f.y + f.h) {
+                    f.active = !f.active;
+                    redrawCanvas();
+                    updateGallery();
+                    startAnimation();
+                    break; 
+                }
+            }
+        });
+
+        // 5. Context Menu (Silme)
+        mainCanvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); 
+            if (!isImageLoaded) return;
+
+            const pos = getCanvasCoordinates(e);
+
+            let deleted = false;
+            for (let i = manualFrames.length - 1; i >= 0; i--) {
+                const f = manualFrames[i];
+                if (pos.x >= f.x && pos.x <= f.x + f.w && pos.y >= f.y && pos.y <= f.y + f.h) {
+                    manualFrames.splice(i, 1);
+                    selectedManualFrameIndex = -1; // Seçimi temizle
+                    deleted = true;
+                    break;
+                }
+            }
+
+            if (deleted) {
+                checkManualFramesBtn();
+                update();
+            }
+        });
+
+        // Helper: Resize Handle Detection
+        function getResizeHandle(pos, frame) {
+            const handleSize = 8 / zoom; // Zoom'a göre handle boyutu
+            const x = frame.x, y = frame.y, w = frame.w, h = frame.h;
+            
+            // Köşeler
+            if (dist(pos.x, pos.y, x, y) < handleSize) return 'tl';
+            if (dist(pos.x, pos.y, x + w, y) < handleSize) return 'tr';
+            if (dist(pos.x, pos.y, x, y + h) < handleSize) return 'bl';
+            if (dist(pos.x, pos.y, x + w, y + h) < handleSize) return 'br';
+            
+            return null;
+        }
+
+        function dist(x1, y1, x2, y2) {
+            return Math.sqrt((x1-x2)**2 + (y1-y2)**2);
+        }
+
+        function getCanvasCoordinates(e) {
+            const rect = mainCanvas.getBoundingClientRect();
+            // Eğer rect 0 ise (gizli vs) hata vermesin
+            if (rect.width === 0 || rect.height === 0) return {x:0, y:0};
+
+            const scaleX = mainCanvas.width / rect.width;
+            const scaleY = mainCanvas.height / rect.height;
+            
+            // Eğer event window'dan geliyorsa clientX kullan, yoksa offset kullanmak daha güvenli olabilir ama
+            // window listener'ında offset çalışmaz. ClientX her zaman çalışır.
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+
+        function checkManualFramesBtn() {
+            if (manualFrames.length > 0) {
+                clearManualBtn.classList.remove('hidden');
+            } else {
+                clearManualBtn.classList.add('hidden');
+            }
+        }
+
+        // --- Zoom Listeners ---
+        document.getElementById('zoomInBtn').addEventListener('click', () => changeZoom(0.1));
+        document.getElementById('zoomOutBtn').addEventListener('click', () => changeZoom(-0.1));
+        document.getElementById('fitBtn').addEventListener('click', fitToScreen);
+        document.getElementById('prevZoomIn').addEventListener('click', () => changePreviewZoom(0.5));
+        document.getElementById('prevZoomOut').addEventListener('click', () => changePreviewZoom(-0.5));
+        document.getElementById('prevFit').addEventListener('click', fitPreview);
+
+        canvasContainer.addEventListener('wheel', (e) => {
+            if(e.ctrlKey) {
+                e.preventDefault();
+                changeZoom(e.deltaY > 0 ? -0.1 : 0.1);
+            }
+        });
+        
+        document.body.addEventListener('dragover', (e) => e.preventDefault());
+        document.body.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                loadImageFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // --- Functions ---
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            loadImageFile(file);
+        }
+
+        function loadImageFile(file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                image.src = event.target.result;
+                image.onload = () => {
+                    isImageLoaded = true;
+                    welcomeText.style.display = 'none';
+                    canvasHoverInfo.classList.remove('hidden'); 
+                    mainCanvas.width = image.width;
+                    mainCanvas.height = image.height;
+                    
+                    offsetXRange.value = 0;
+                    offsetYRange.value = 0;
+                    paddingRange.value = 0;
+                    
+                    frames = [];
+                    manualFrames = [];
+                    checkManualFramesBtn();
+
+                    fitToScreen();
+                    fitPreview();
+                    update();
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function changeZoom(delta) {
+            if(!isImageLoaded) return;
+            let newZoom = zoom + delta;
+            if(newZoom < 0.1) newZoom = 0.1;
+            if(newZoom > 5) newZoom = 5;
+            zoom = newZoom;
+            applyZoom();
+        }
+
+        function fitToScreen() {
+            if(!isImageLoaded) return;
+            const padding = 80; 
+            const containerW = canvasContainer.clientWidth - padding;
+            const containerH = canvasContainer.clientHeight - padding;
+            const ratioW = containerW / image.width;
+            const ratioH = containerH / image.height;
+            zoom = Math.min(ratioW, ratioH, 1);
+            if (zoom < 0.1) zoom = 0.1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            mainCanvas.style.width = (image.width * zoom) + 'px';
+            mainCanvas.style.height = (image.height * zoom) + 'px';
+            zoomDisplay.innerText = Math.round(zoom * 100) + '%';
+        }
+
+        function changePreviewZoom(delta) {
+            if(!isImageLoaded) return;
+            if (previewZoom === -1) previewZoom = 1;
+            
+            let newZoom = previewZoom + delta;
+            if(newZoom < 0.5) newZoom = 0.5;
+            if(newZoom > 10) newZoom = 10;
+            
+            previewZoom = newZoom;
+            applyPreviewZoom();
+        }
+
+        function fitPreview() {
+            if(!isImageLoaded) return;
+            previewZoom = -1;
+            applyPreviewZoom();
+        }
+
+        function applyPreviewZoom() {
+            if (previewZoom === -1) {
+                previewCanvas.style.width = '';
+                previewCanvas.style.height = '';
+                previewCanvas.className = "max-w-full max-h-full object-contain";
+                prevZoomDisplay.innerText = "Otomatik";
+            } else {
+                previewCanvas.className = ""; 
+                const w = frames.length > 0 ? frames[0].w : 100;
+                const h = frames.length > 0 ? frames[0].h : 100;
+                
+                previewCanvas.style.width = (w * previewZoom) + 'px';
+                previewCanvas.style.height = (h * previewZoom) + 'px';
+                prevZoomDisplay.innerText = Math.round(previewZoom * 100) + '%';
+            }
+        }
+
+        function update() {
+            if (!isImageLoaded) return;
+
+            offsetXVal.innerText = offsetXRange.value + 'px';
+            offsetYVal.innerText = offsetYRange.value + 'px';
+            paddingVal.innerText = paddingRange.value + 'px';
+
+            const cols = parseInt(colsInput.value) || 1;
+            const rows = parseInt(rowsInput.value) || 1;
+            const offX = parseInt(offsetXRange.value);
+            const offY = parseInt(offsetYRange.value);
+            const pad = parseInt(paddingRange.value);
+
+            const cellWidth = (image.width / cols) + pad; 
+            const cellHeight = image.height / rows;
+
+            const oldFrames = frames.filter(f => !f.isManual);
+            
+            let gridFrames = [];
+            let globalIndex = 0;
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const drawX = (x * cellWidth) + offX;
+                    const drawY = (y * cellHeight) + offY;
+                    
+                    let isActive = true;
+                    if (globalIndex < oldFrames.length) {
+                        isActive = oldFrames[globalIndex].active;
+                    }
+
+                    gridFrames.push({
+                        x: drawX,
+                        y: drawY,
+                        w: cellWidth,
+                        h: cellHeight,
+                        active: isActive,
+                        isManual: false
+                    });
+                    globalIndex++;
+                }
+            }
+
+            frames = [...gridFrames, ...manualFrames];
+
+            redrawCanvas(); 
+            updateGallery();
+            startAnimation();
+            
+            if (previewZoom !== -1) applyPreviewZoom();
+        }
+
+        function redrawCanvas() {
+            mainCanvas.width = image.width;
+            mainCanvas.height = image.height;
+            applyZoom();
+
+            ctx.drawImage(image, 0, 0);
+            
+            ctx.lineWidth = 2 / zoom; 
+            
+            frames.forEach((frame, index) => {
+                if (isManualMode && !frame.isManual) return;
+
+                if (frame.isManual) {
+                    // Seçili ise daha belirgin
+                    const isSelected = (index === (frames.length - manualFrames.length + selectedManualFrameIndex));
+                    ctx.strokeStyle = (isSelected || frame.active) ? '#7aa2f7' : 'rgba(122, 162, 247, 0.4)'; 
+                    
+                    if (isSelected) ctx.lineWidth = 3 / zoom;
+                    else ctx.lineWidth = 2 / zoom;
+
+                } else {
+                    ctx.strokeStyle = frame.active ? '#f43f5e' : 'rgba(244, 63, 94, 0.3)';
+                    ctx.lineWidth = 2 / zoom;
+                }
+                
+                ctx.beginPath();
+                ctx.rect(frame.x, frame.y, frame.w, frame.h);
+                ctx.stroke();
+
+                if (!frame.active) {
+                    ctx.fillStyle = frame.isManual ? 'rgba(59, 130, 246, 0.35)' : 'rgba(220, 38, 38, 0.35)';
+                    ctx.fillRect(frame.x, frame.y, frame.w, frame.h);
+
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = 3 / zoom;
+                    ctx.beginPath();
+                    ctx.moveTo(frame.x + (frame.w * 0.2), frame.y + (frame.h * 0.2));
+                    ctx.lineTo(frame.x + (frame.w * 0.8), frame.y + (frame.h * 0.8));
+                    ctx.moveTo(frame.x + (frame.w * 0.8), frame.y + (frame.h * 0.2));
+                    ctx.lineTo(frame.x + (frame.w * 0.2), frame.y + (frame.h * 0.8));
+                    ctx.stroke();
+                }
+
+                // Seçili Manuel Kare için Tutamaçlar
+                if (isManualMode && frame.isManual && (index === (frames.length - manualFrames.length + selectedManualFrameIndex))) {
+                    drawResizeHandles(frame);
+                }
+            });
+
+            if (isDrawing && dragRect && isManualMode) {
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2 / zoom;
+                ctx.setLineDash([5, 5]); 
+                ctx.strokeRect(dragRect.x, dragRect.y, dragRect.w, dragRect.h);
+                ctx.setLineDash([]); 
+            }
+        }
+
+        function drawResizeHandles(frame) {
+            const handleSize = 8 / zoom;
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#7aa2f7';
+            ctx.lineWidth = 1 / zoom;
+
+            const handles = [
+                {x: frame.x, y: frame.y}, // TL
+                {x: frame.x + frame.w, y: frame.y}, // TR
+                {x: frame.x, y: frame.y + frame.h}, // BL
+                {x: frame.x + frame.w, y: frame.y + frame.h} // BR
+            ];
+
+            handles.forEach(h => {
+                ctx.fillRect(h.x - handleSize/2, h.y - handleSize/2, handleSize, handleSize);
+                ctx.strokeRect(h.x - handleSize/2, h.y - handleSize/2, handleSize, handleSize);
+            });
+        }
+
+        function updateGallery() {
+            const gallery = document.getElementById('framesGallery');
+            gallery.innerHTML = '';
+
+            frames.forEach((frame, index) => {
+                if (isManualMode && !frame.isManual) return;
+
+                const tCanvas = document.createElement('canvas');
+                tCanvas.width = frame.w;
+                tCanvas.height = frame.h;
+                const tCtx = tCanvas.getContext('2d');
+                tCtx.drawImage(image, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
+
+                const wrapper = document.createElement('div');
+                wrapper.className = `frame-wrapper relative h-full aspect-[${frame.w}/${frame.h}] cursor-pointer transition rounded border-2 overflow-hidden flex-shrink-0 group`;
+                
+                if (frame.active) {
+                    wrapper.className += frame.isManual ? ' border-[#7aa2f7]' : ' border-[#414868] hover:border-[#f43f5e]';
+                } else {
+                    wrapper.classList.add('frame-disabled');
+                }
+
+                const img = document.createElement('img');
+                img.src = tCanvas.toDataURL();
+                img.className = 'h-full w-auto object-contain transition-all duration-300';
+                
+                const toggleBtn = document.createElement('div');
+                toggleBtn.className = 'frame-overlay absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-opacity duration-200 z-10 opacity-0 group-hover:opacity-100';
+                
+                if (frame.active) {
+                    toggleBtn.classList.add('bg-green-500/90', 'hover:bg-green-600');
+                    toggleBtn.innerHTML = '<i class="fa-solid fa-eye text-white text-xs"></i>';
+                    toggleBtn.title = "Kareyi Gizle/Kaldır";
+                } else {
+                    toggleBtn.classList.add('bg-red-500/90', 'hover:bg-red-600', 'opacity-100'); 
+                    toggleBtn.innerHTML = '<i class="fa-solid fa-eye-slash text-white text-xs"></i>';
+                    toggleBtn.title = "Kareyi Göster/Ekle";
+                }
+
+                if (frame.isManual) {
+                    const manualBadge = document.createElement('div');
+                    manualBadge.className = 'absolute top-1 left-1 bg-[#7aa2f7] text-[#1a1b26] text-[9px] font-bold px-1 rounded shadow';
+                    manualBadge.innerText = 'M';
+                    wrapper.appendChild(manualBadge);
+                }
+
+                img.onclick = (e) => {
+                    e.stopPropagation(); 
+                    previewSingleFrame(frame);
+                };
+
+                const toggleAction = (e) => {
+                    e.stopPropagation();
+                    frame.active = !frame.active;
+                    redrawCanvas(); 
+                    updateGallery(); 
+                    startAnimation(); 
+                };
+
+                toggleBtn.onclick = toggleAction;
+                wrapper.onclick = (e) => previewSingleFrame(frame);
+
+                wrapper.appendChild(img);
+                wrapper.appendChild(toggleBtn);
+                gallery.appendChild(wrapper);
+            });
+        }
+
+        function previewSingleFrame(frame) {
+            clearInterval(animationInterval);
+            previewCanvas.width = frame.w;
+            previewCanvas.height = frame.h;
+            pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            pCtx.drawImage(image, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
+            if (previewZoom !== -1) applyPreviewZoom();
+            noActiveFramesMsg.classList.add('hidden');
+        }
+
+        function startAnimation() {
+            clearInterval(animationInterval);
+            
+            const activeFrames = frames.filter(f => f.active && (!isManualMode || f.isManual));
+
+            if (activeFrames.length === 0) {
+                pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+                noActiveFramesMsg.classList.remove('hidden');
+                return;
+            } else {
+                noActiveFramesMsg.classList.add('hidden');
+            }
+
+            const fps = parseInt(fpsRange.value);
+            const interval = 1000 / fps;
+            currentFrame = 0;
+
+            previewCanvas.width = activeFrames[0].w;
+            previewCanvas.height = activeFrames[0].h;
+            
+            if (previewZoom !== -1) applyPreviewZoom();
+
+            animationInterval = setInterval(() => {
+                const frame = activeFrames[currentFrame];
+                
+                if (previewCanvas.width !== frame.w || previewCanvas.height !== frame.h) {
+                    previewCanvas.width = frame.w;
+                    previewCanvas.height = frame.h;
+                }
+                
+                pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+                pCtx.drawImage(image, frame.x, frame.y, frame.w, frame.h, 0, 0, previewCanvas.width, previewCanvas.height);
+                
+                currentFrame = (currentFrame + 1) % activeFrames.length;
+            }, interval);
+        }
+
+        downloadAllBtn.addEventListener('click', () => {
+            if(!isImageLoaded) return alert("Önce resim yükleyin!");
+
+            const activeFrames = frames.filter(f => f.active);
+            if(activeFrames.length === 0) return alert("İndirilecek aktif kare yok!");
+
+            const originalText = downloadAllBtn.innerHTML;
+            downloadAllBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Hazırlanıyor...`;
+            downloadAllBtn.disabled = true;
+
+            const zip = new JSZip();
+            const folder = zip.folder("pixel_slicer_frames");
+
+            activeFrames.forEach((frame, index) => {
+                const tCanvas = document.createElement('canvas');
+                tCanvas.width = frame.w;
+                tCanvas.height = frame.h;
+                const tCtx = tCanvas.getContext('2d');
+                tCtx.drawImage(image, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
+                
+                const imgData = tCanvas.toDataURL("image/png");
+                const base64Data = imgData.split(',')[1];
+                
+                folder.file(`frame_${index + 1}.png`, base64Data, {base64: true});
+            });
+
+            zip.generateAsync({type:"blob"})
+            .then(function(content) {
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(content);
+                a.download = "pixel_slicer_sprites.zip";
+                a.click();
+                URL.revokeObjectURL(a.href);
+                downloadAllBtn.innerHTML = originalText;
+                downloadAllBtn.disabled = false;
+            });
+        });
+
+    </script>
+</body>
+</html>
