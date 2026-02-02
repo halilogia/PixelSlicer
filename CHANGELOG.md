@@ -8,7 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### ✨ Eklenenler
 
--
+- Her bir kare için tekli indirme (Single Frame Download) butonu eklendi.
 
 ### 🔧 Düzeltmeler
 
