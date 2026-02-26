@@ -181,61 +181,61 @@
             </div>
 
             <!-- Animasyon Önizleme -->
-            <div class="space-y-3 flex-1 flex flex-col min-h-0">
+            <div class="space-y-3 flex flex-col shrink-0">
                 <h3 class="text-white font-semibold border-b border-[#414868] pb-1 flex justify-between items-center">
                     <span><i class="fa-solid fa-play text-[#9ece6a]"></i> Önizleme</span>
                     <span id="prevZoomDisplay" class="text-[10px] text-gray-400 font-mono">Otomatik</span>
                 </h3>
 
-                <div class="flex flex-col gap-2 flex-1 min-h-0">
+                <div class="flex flex-col gap-2 shrink-0">
                     <div id="previewContainer"
-                        class="flex justify-center bg-[#16161e] p-2 rounded border border-[#414868] canvas-bg h-full min-h-[120px] overflow-hidden items-center relative">
+                        class="bg-[#16161e] p-2 rounded border border-[#414868] canvas-bg h-32 overflow-hidden flex items-center justify-center relative">
                         <canvas id="previewCanvas" class="max-w-full max-h-full object-contain"></canvas>
                         <div id="noActiveFramesMsg"
-                            class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-xs text-center hidden p-2">
-                            Tüm kareler devre dışı.
+                            class="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-[10px] text-center hidden p-2">
+                            Pasif
                         </div>
                     </div>
 
                     <!-- Önizleme Zoom Kontrolleri -->
-                    <div class="flex justify-center gap-2 shrink-0">
+                    <div class="flex justify-center gap-1 shrink-0">
                         <button id="prevZoomOut"
-                            class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white px-2 py-1 rounded text-xs transition"><i
+                            class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white w-7 h-7 flex items-center justify-center rounded text-xs transition"><i
                                 class="fa-solid fa-minus"></i></button>
                         <button id="prevFit"
-                            class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white px-3 py-1 rounded text-xs font-bold transition">SIĞDIR</button>
+                            class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white px-2 h-7 rounded text-[10px] font-bold transition">SIĞDIR</button>
                         <button id="prevZoomIn"
-                            class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white px-2 py-1 rounded text-xs transition"><i
+                            class="bg-[#292e42] hover:bg-[#3d59a1] text-[#7aa2f7] hover:text-white w-7 h-7 flex items-center justify-center rounded text-xs transition"><i
                                 class="fa-solid fa-plus"></i></button>
                     </div>
                 </div>
 
-                <div class="shrink-0">
-                    <label class="text-xs font-bold uppercase text-[#565f89]">Hız (FPS)</label>
+                <div class="pt-2 border-t border-[#414868]/30">
+                    <label class="text-[10px] font-bold uppercase text-[#565f89]">Hız (FPS)</label>
                     <input type="range" id="fpsRange" min="1" max="60" value="8"
-                        class="w-full h-1 bg-[#414868] rounded-lg appearance-none cursor-pointer mt-2">
+                        class="w-full h-1 bg-[#414868] rounded-lg appearance-none cursor-pointer mt-1">
                     <div class="text-center text-xs text-[#7aa2f7] mt-1"><span id="fpsVal">8</span> FPS</div>
                 </div>
             </div>
 
-            <div class="mt-auto space-y-2">
-                <div class="bg-[#292e42] p-3 rounded-lg border border-[#414868]">
-                    <div class="flex justify-between items-center mb-1">
-                        <label class="text-[10px] font-bold uppercase text-[#565f89]">Sheet Sütun Sayısı</label>
-                    </div>
+            <div class="pt-4 space-y-2 shrink-0 pb-8">
+                <div class="bg-[#292e42]/50 p-2 rounded border border-[#414868]/50">
+                    <label class="text-[9px] font-bold uppercase text-[#565f89] block mb-1">Sheet Sütun</label>
                     <input type="number" id="sheetColsInput" value="8" min="1"
-                        class="w-full bg-[#16161e] border border-[#414868] rounded p-1 text-xs text-white focus:border-[#7aa2f7] outline-none">
+                        class="w-full bg-[#16161e] border border-[#414868] rounded px-2 py-1 text-xs text-white focus:border-[#7aa2f7] outline-none">
                 </div>
 
-                <button id="downloadSheetBtn"
-                    class="w-full bg-[#7aa2f7] hover:bg-[#3d59a1] text-white font-bold py-2 rounded-lg transition shrink-0 flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 text-sm">
-                    <i class="fa-solid fa-image"></i> Sprite Sheet İndir
-                </button>
+                <div class="grid grid-cols-1 gap-2">
+                    <button id="downloadSheetBtn"
+                        class="w-full bg-[#7aa2f7] hover:bg-[#3d59a1] text-white font-bold py-2 rounded transition flex items-center justify-center gap-2 shadow-lg shadow-blue-900/10 text-xs">
+                        <i class="fa-solid fa-image"></i> Sprite Sheet
+                    </button>
 
-                <button id="downloadAllBtn"
-                    class="w-full bg-[#bb9af7] hover:bg-[#9d7cd8] text-[#1a1b26] font-bold py-2 rounded-lg transition shrink-0 flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 text-sm">
-                    <i class="fa-solid fa-file-zipper"></i> ZIP Olarak İndir
-                </button>
+                    <button id="downloadAllBtn"
+                        class="w-full bg-[#bb9af7] hover:bg-[#9d7cd8] text-[#1a1b26] font-bold py-2 rounded transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/10 text-xs">
+                        <i class="fa-solid fa-file-zipper"></i> ZIP İndir
+                    </button>
+                </div>
             </div>
 
         </aside>
@@ -363,6 +363,12 @@
             offsetXRange.value = 0;
             offsetYRange.value = 0;
             paddingRange.value = 0;
+            update();
+        });
+
+        colsInput.addEventListener('input', () => {
+            // Sütun sayısı değiştiğinde, eğer kullanıcı manuel müdahale etmediyse şablon sütunu da güncelle
+            sheetColsInput.value = colsInput.value;
             update();
         });
 
@@ -662,12 +668,14 @@
             const file = e.target.files[0];
             if (!file) return;
             loadImageFile(file);
+            e.target.value = ''; // Aynı dosyayı tekrar yükleyebilmek için reset
         }
 
         async function handleGifUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
-            loadGifFile(file);
+            await loadGifFile(file);
+            e.target.value = ''; // Aynı dosyayı tekrar yükleyebilmek için reset
         }
 
         async function loadGifFile(file) {
@@ -722,6 +730,7 @@
 
                     colsInput.value = numFrames;
                     rowsInput.value = 1;
+                    sheetColsInput.value = numFrames;
                     offsetXRange.value = 0;
                     offsetYRange.value = 0;
                     paddingRange.value = 0;
@@ -761,6 +770,7 @@
                     manualFrames = [];
                     checkManualFramesBtn();
 
+                    sheetColsInput.value = colsInput.value;
                     fitToScreen();
                     fitPreview();
                     update();
