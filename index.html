@@ -7,6 +7,7 @@
     <title>PixelSlicer - Online Sprite Cutter</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
@@ -76,6 +77,11 @@
             </div>
         </div>
         <div class="flex gap-4">
+            <label
+                class="cursor-pointer bg-[#9ece6a] hover:bg-[#73d216] text-[#1a1b26] px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2 shadow-lg shadow-green-900/20">
+                <i class="fa-solid fa-film"></i> GIF Yükle
+                <input type="file" id="gifUploadInput" accept="image/gif" class="hidden">
+            </label>
             <label
                 class="cursor-pointer bg-[#7aa2f7] hover:bg-[#3d59a1] text-white px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2 shadow-lg shadow-blue-900/20">
                 <i class="fa-solid fa-upload"></i> Resim Yükle
@@ -276,6 +282,7 @@
     <script>
         // --- Elements ---
         const uploadInput = document.getElementById('uploadInput');
+        const gifUploadInput = document.getElementById('gifUploadInput');
         const mainCanvas = document.getElementById('mainCanvas');
         const ctx = mainCanvas.getContext('2d');
         const previewCanvas = document.getElementById('previewCanvas');
@@ -329,6 +336,7 @@
 
         // --- Event Listeners ---
         uploadInput.addEventListener('change', handleImageUpload);
+        gifUploadInput.addEventListener('change', handleGifUpload);
 
         [colsInput, rowsInput, offsetXRange, offsetYRange, paddingRange].forEach(input => {
             input.addEventListener('input', update);
@@ -623,7 +631,12 @@
         document.body.addEventListener('drop', (e) => {
             e.preventDefault();
             if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                loadImageFile(e.dataTransfer.files[0]);
+                const file = e.dataTransfer.files[0];
+                if (file.type === 'image/gif') {
+                    loadGifFile(file);
+                } else {
+                    loadImageFile(file);
+                }
             }
         });
 
@@ -632,6 +645,84 @@
             const file = e.target.files[0];
             if (!file) return;
             loadImageFile(file);
+        }
+
+        async function handleGifUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            loadGifFile(file);
+        }
+
+        async function loadGifFile(file) {
+            const gifBtn = document.getElementById('gifUploadInput').parentElement;
+            
+            try {
+                gifBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> İşleniyor...';
+                
+                const arrayBuffer = await file.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+                const reader = new GifReader(uint8Array);
+                
+                const numFrames = reader.numFrames();
+                if (numFrames === 0) throw new Error("GIF kareleri bulunamadı.");
+
+                const gifWidth = reader.width;
+                const gifHeight = reader.height;
+                const totalWidth = gifWidth * numFrames;
+
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = totalWidth;
+                tempCanvas.height = gifHeight;
+                const tCtx = tempCanvas.getContext('2d');
+
+                // Tek bir tam boyutlu buffer kullanıyoruz. 
+                // omggif bu buffer'ı her karede güncelleyerek disposal ve blending'i otomatik halleder.
+                const fullFrameData = new Uint8ClampedArray(gifWidth * gifHeight * 4);
+                
+                // Kareleri yan yana çiz
+                for (let i = 0; i < numFrames; i++) {
+                    // decodeAndBlitFrameRGBA, fullFrameData'yı i. kareye göre günceller
+                    reader.decodeAndBlitFrameRGBA(i, fullFrameData);
+                    
+                    const frameImageData = new ImageData(new Uint8ClampedArray(fullFrameData), gifWidth, gifHeight);
+                    const frameCanvas = document.createElement('canvas');
+                    frameCanvas.width = gifWidth;
+                    frameCanvas.height = gifHeight;
+                    frameCanvas.getContext('2d').putImageData(frameImageData, 0, 0);
+                    
+                    tCtx.drawImage(frameCanvas, i * gifWidth, 0);
+                }
+
+                const spriteStripUrl = tempCanvas.toDataURL("image/png");
+                
+                image.src = spriteStripUrl;
+                image.onload = () => {
+                    isImageLoaded = true;
+                    welcomeText.style.display = 'none';
+                    canvasHoverInfo.classList.remove('hidden');
+                    mainCanvas.width = image.width;
+                    mainCanvas.height = image.height;
+
+                    colsInput.value = numFrames;
+                    rowsInput.value = 1;
+                    offsetXRange.value = 0;
+                    offsetYRange.value = 0;
+                    paddingRange.value = 0;
+
+                    manualFrames = [];
+                    checkManualFramesBtn();
+
+                    fitToScreen();
+                    fitPreview();
+                    update();
+                };
+
+            } catch (err) {
+                console.error("GIF Hatası:", err);
+                alert("GIF işlenirken bir hata oluştu: " + err.message);
+            } finally {
+                gifBtn.innerHTML = '<i class="fa-solid fa-film"></i> GIF Yükle';
+            }
         }
 
         function loadImageFile(file) {
