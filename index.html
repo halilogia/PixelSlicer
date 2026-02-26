@@ -218,10 +218,25 @@
                 </div>
             </div>
 
-            <button id="downloadAllBtn"
-                class="w-full bg-[#bb9af7] hover:bg-[#9d7cd8] text-[#1a1b26] font-bold py-3 rounded-lg transition mt-auto shrink-0 flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20">
-                <i class="fa-solid fa-file-zipper"></i> ZIP Olarak İndir
-            </button>
+            <div class="mt-auto space-y-2">
+                <div class="bg-[#292e42] p-3 rounded-lg border border-[#414868]">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-[10px] font-bold uppercase text-[#565f89]">Sheet Sütun Sayısı</label>
+                    </div>
+                    <input type="number" id="sheetColsInput" value="8" min="1"
+                        class="w-full bg-[#16161e] border border-[#414868] rounded p-1 text-xs text-white focus:border-[#7aa2f7] outline-none">
+                </div>
+
+                <button id="downloadSheetBtn"
+                    class="w-full bg-[#7aa2f7] hover:bg-[#3d59a1] text-white font-bold py-2 rounded-lg transition shrink-0 flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 text-sm">
+                    <i class="fa-solid fa-image"></i> Sprite Sheet İndir
+                </button>
+
+                <button id="downloadAllBtn"
+                    class="w-full bg-[#bb9af7] hover:bg-[#9d7cd8] text-[#1a1b26] font-bold py-2 rounded-lg transition shrink-0 flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20 text-sm">
+                    <i class="fa-solid fa-file-zipper"></i> ZIP Olarak İndir
+                </button>
+            </div>
 
         </aside>
 
@@ -301,6 +316,8 @@
         const fpsRange = document.getElementById('fpsRange');
         const resetFineTuneBtn = document.getElementById('resetFineTuneBtn');
         const downloadAllBtn = document.getElementById('downloadAllBtn');
+        const downloadSheetBtn = document.getElementById('downloadSheetBtn');
+        const sheetColsInput = document.getElementById('sheetColsInput');
         const toggleManualModeBtn = document.getElementById('toggleManualModeBtn');
         const clearManualBtn = document.getElementById('clearManualBtn');
 
@@ -1116,6 +1133,64 @@
                     downloadAllBtn.innerHTML = originalText;
                     downloadAllBtn.disabled = false;
                 });
+        });
+
+        downloadSheetBtn.addEventListener('click', () => {
+            if (!isImageLoaded) return alert("Önce resim yükleyin!");
+
+            const activeFrames = frames.filter(f => f.active);
+            if (activeFrames.length === 0) return alert("İndirilecek aktif kare yok!");
+
+            const originalText = downloadSheetBtn.innerHTML;
+            downloadSheetBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Hazırlanıyor...`;
+            downloadSheetBtn.disabled = true;
+
+            setTimeout(() => {
+                try {
+                    const sheetCols = parseInt(sheetColsInput.value) || 8;
+                    const numFrames = activeFrames.length;
+                    const sheetRows = Math.ceil(numFrames / sheetCols);
+
+                    // Grid yapısı için tüm karelerin en büyük genişlik ve yüksekliğini bul
+                    let maxW = 0;
+                    let maxH = 0;
+                    activeFrames.forEach(f => {
+                        maxW = Math.max(maxW, f.w);
+                        maxH = Math.max(maxH, f.h);
+                    });
+
+                    const sheetCanvas = document.createElement('canvas');
+                    sheetCanvas.width = maxW * sheetCols;
+                    sheetCanvas.height = maxH * sheetRows;
+                    const sCtx = sheetCanvas.getContext('2d');
+
+                    activeFrames.forEach((frame, index) => {
+                        const col = index % sheetCols;
+                        const row = Math.floor(index / sheetCols);
+                        
+                        // Kareyi hücrenin ortasına hizalamak için offset hesapla
+                        const xOffset = (maxW - frame.w) / 2;
+                        const yOffset = (maxH - frame.h) / 2;
+
+                        sCtx.drawImage(
+                            image, 
+                            frame.x, frame.y, frame.w, frame.h, 
+                            (col * maxW) + xOffset, (row * maxH) + yOffset, frame.w, frame.h
+                        );
+                    });
+
+                    const a = document.createElement("a");
+                    a.href = sheetCanvas.toDataURL("image/png");
+                    a.download = "pixel_slicer_sheet.png";
+                    a.click();
+                } catch (err) {
+                    console.error("Sheet Export Error:", err);
+                    alert("Sprite Sheet oluşturulurken bir hata oluştu.");
+                } finally {
+                    downloadSheetBtn.innerHTML = originalText;
+                    downloadSheetBtn.disabled = false;
+                }
+            }, 100);
         });
 
     </script>
