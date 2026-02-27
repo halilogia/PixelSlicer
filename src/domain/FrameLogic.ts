@@ -172,13 +172,16 @@ export function calculateSpriteSheet(
   }
 
   const rows = Math.ceil(frames.length / columns);
-  let maxWidth = 0;
-  let maxHeight = 0;
+  let maxFrameWidth = 0;
+  let maxFrameHeight = 0;
 
   for (const frame of frames) {
-    maxWidth = Math.max(maxWidth, frame.x + frame.w);
-    maxHeight = Math.max(maxHeight, frame.y + frame.h);
+    maxFrameWidth = Math.max(maxFrameWidth, frame.w);
+    maxFrameHeight = Math.max(maxFrameHeight, frame.h);
   }
 
-  return { width: maxWidth, height: maxHeight };
+  const width = maxFrameWidth * columns;
+  const height = maxFrameHeight * rows;
+
+  return { width, height };
 }

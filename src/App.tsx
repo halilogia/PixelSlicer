@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { EditorViewModel } from './presentation/EditorViewModel';
 import { exportAsZip, exportAsSpriteSheet, downloadBlob } from './infrastructure/ExportService';
 import { decodeGif } from './infrastructure/GifService';
-import type { Frame, GridConfig } from './domain/FrameLogic';
+import type { GridConfig } from './domain/FrameLogic';
 
 // Initialize ViewModel
 const viewModel = new EditorViewModel();
