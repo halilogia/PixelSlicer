@@ -674,15 +674,24 @@
         async function handleGifUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
+            
+            // Önce eski animasyonu durdur
+            clearInterval(animationInterval);
+            
             await loadGifFile(file);
             e.target.value = ''; // Aynı dosyayı tekrar yükleyebilmek için reset
         }
 
         async function loadGifFile(file) {
-            const gifBtn = document.getElementById('gifUploadInput').parentElement;
+            const gifLabel = document.getElementById('gifUploadInput').parentElement;
+            const gifInput = document.getElementById('gifUploadInput');
+            
+            // Input elementini label'dan ayır, işlem bitince geri ekle
+            gifLabel.removeChild(gifInput);
             
             try {
-                gifBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> İşleniyor...';
+                // Sadece icon ve text'i değiştir, inputu label dışında tut
+                gifLabel.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> İşleniyor...';
                 
                 const arrayBuffer = await file.arrayBuffer();
                 const uint8Array = new Uint8Array(arrayBuffer);
@@ -700,13 +709,9 @@
                 tempCanvas.height = gifHeight;
                 const tCtx = tempCanvas.getContext('2d');
 
-                // Tek bir tam boyutlu buffer kullanıyoruz. 
-                // omggif bu buffer'ı her karede güncelleyerek disposal ve blending'i otomatik halleder.
                 const fullFrameData = new Uint8ClampedArray(gifWidth * gifHeight * 4);
                 
-                // Kareleri yan yana çiz
                 for (let i = 0; i < numFrames; i++) {
-                    // decodeAndBlitFrameRGBA, fullFrameData'yı i. kareye göre günceller
                     reader.decodeAndBlitFrameRGBA(i, fullFrameData);
                     
                     const frameImageData = new ImageData(new Uint8ClampedArray(fullFrameData), gifWidth, gifHeight);
@@ -720,8 +725,10 @@
 
                 const spriteStripUrl = tempCanvas.toDataURL("image/png");
                 
-                image.src = spriteStripUrl;
+                // Image objesini yeniden kullan ama src'yi temizle ve yeniden yükle
+                image.src = '';
                 image.onload = () => {
+                    console.log('Yeni GIF yüklendi:', numFrames, 'kare', 'boyut:', image.width, 'x', image.height);
                     isImageLoaded = true;
                     welcomeText.style.display = 'none';
                     canvasHoverInfo.classList.remove('hidden');
@@ -735,19 +742,28 @@
                     offsetYRange.value = 0;
                     paddingRange.value = 0;
 
+                    frames = [];
                     manualFrames = [];
                     checkManualFramesBtn();
 
+                    sheetColsInput.value = colsInput.value;
                     fitToScreen();
                     fitPreview();
                     update();
                 };
+                image.onerror = (err) => {
+                    console.error('GIF yükleme hatası:', err);
+                    alert('GIF yüklenirken hata oluştu');
+                };
+                image.src = spriteStripUrl;
 
             } catch (err) {
                 console.error("GIF Hatası:", err);
                 alert("GIF işlenirken bir hata oluştu: " + err.message);
             } finally {
-                gifBtn.innerHTML = '<i class="fa-solid fa-film"></i> GIF Yükle';
+                // Label'ı es haline getir ve inputu geri ekle
+                gifLabel.innerHTML = '<i class="fa-solid fa-film"></i> GIF Yükle';
+                gifLabel.appendChild(gifInput);
             }
         }
 
@@ -843,6 +859,8 @@
 
         function update() {
             if (!isImageLoaded) return;
+
+            console.log('Update çağrıldı, image boyutu:', image.width, 'x', image.height);
 
             offsetXVal.innerText = offsetXRange.value + 'px';
             offsetYVal.innerText = offsetYRange.value + 'px';
