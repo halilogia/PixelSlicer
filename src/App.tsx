@@ -4,7 +4,7 @@ import { exportAsZip, exportAsSpriteSheet, downloadBlob } from './infrastructure
 import { decodeGif } from './infrastructure/GifService';
 import type { GridConfig } from './domain/FrameLogic';
 import { useI18n } from './i18n/useI18n';
-import type { Language } from './i18n/translations';
+import GallerySection from './components/GallerySection';
 import './styles/main.css';
 
 // Initialize ViewModel
@@ -26,6 +26,31 @@ function App() {
     return unsubscribe;
   }, []);
 
+  // Animation frame counter for marching ants effect
+  const animationFrameRef = useRef<number>(0);
+  const [marchingAntsOffset, setMarchingAntsOffset] = useState(0);
+  
+  // Marching ants animation - only runs when drawing in manual mode
+  useEffect(() => {
+    if (!state.isManualMode || !state.isDrawing) return;
+    
+    let lastTime = 0;
+    const animate = (time: number) => {
+      if (time - lastTime > 50) { // Update every 50ms
+        setMarchingAntsOffset(prev => (prev + 1) % 16);
+        lastTime = time;
+      }
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [state.isManualMode, state.isDrawing]);
+
   // Draw main canvas when state changes
   useEffect(() => {
     const canvas = mainCanvasRef.current;
@@ -42,42 +67,138 @@ function App() {
     // Draw image
     ctx.drawImage(state.image, 0, 0);
     
+    // Get drawing state for real-time feedback from state
+    const drawingState = state.isDrawing ? {
+      isDrawing: state.isDrawing,
+      startX: state.drawStartX,
+      startY: state.drawStartY,
+      currentX: state.drawCurrentX,
+      currentY: state.drawCurrentY,
+    } : null;
+    
     // Draw frames
     const allFrames = viewModel.getFrames();
     allFrames.forEach((frame, index) => {
-      // When manual mode is on, only show manual frames
+      // When manual mode is on, completely hide automatic selection frames
       const isManual = index >= state.frames.length;
       if (state.isManualMode && !isManual) return;
       
-      const isSelected = isManual && index - state.frames.length === state.selectedManualFrameIndex;
+      const manualFrameIndex = index - state.frames.length;
+      const isSelected = isManual && manualFrameIndex === state.selectedManualFrameIndex;
+      const isBeingDrawn = isManual && drawingState && manualFrameIndex === state.manualFrames.length - 1;
       
-      // Frame border - active: blue, inactive: red
-      ctx.strokeStyle = isSelected ? '#7aa2f7' : frame.isActive ? '#7aa2f7' : '#f43f5e';
-      ctx.lineWidth = frame.isActive ? 2 : 3;
-      ctx.strokeRect(frame.x, frame.y, frame.w, frame.h);
-      
-      // Draw X mark for inactive frames
-      if (!frame.isActive) {
-        ctx.strokeStyle = '#f43f5e';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(frame.x + 4, frame.y + 4);
-        ctx.lineTo(frame.x + frame.w - 4, frame.y + frame.h - 4);
-        ctx.moveTo(frame.x + frame.w - 4, frame.y + 4);
-        ctx.lineTo(frame.x + 4, frame.y + frame.h - 4);
-        ctx.stroke();
-      }
-      
-      // Frame number for active frames
-      if (frame.isActive) {
-        ctx.fillStyle = '#7aa2f7';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(String(frame.index + 1), frame.x + 4, frame.y + 14);
+      if (isBeingDrawn && drawingState) {
+        // Draw marching ants / dashed border for selection in progress
+        const drawX = Math.min(drawingState.startX, drawingState.currentX);
+        const drawY = Math.min(drawingState.startY, drawingState.currentY);
+        const drawW = Math.abs(drawingState.currentX - drawingState.startX);
+        const drawH = Math.abs(drawingState.currentY - drawingState.startY);
+        
+        if (drawW > 0 && drawH > 0) {
+          // Semi-transparent overlay
+          ctx.fillStyle = 'rgba(122, 162, 247, 0.15)';
+          ctx.fillRect(drawX, drawY, drawW, drawH);
+          
+          // Marching ants border
+          ctx.strokeStyle = '#7aa2f7';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 4]);
+          ctx.lineDashOffset = -marchingAntsOffset;
+          ctx.strokeRect(drawX, drawY, drawW, drawH);
+          ctx.setLineDash([]);
+          ctx.lineDashOffset = 0;
+          
+          // Dynamic border trail - corners
+          ctx.fillStyle = '#7aa2f7';
+          const handleSize = 8;
+          // Top-left
+          ctx.fillRect(drawX - handleSize/2, drawY - handleSize/2, handleSize, handleSize);
+          // Top-right
+          ctx.fillRect(drawX + drawW - handleSize/2, drawY - handleSize/2, handleSize, handleSize);
+          // Bottom-left
+          ctx.fillRect(drawX - handleSize/2, drawY + drawH - handleSize/2, handleSize, handleSize);
+          // Bottom-right
+          ctx.fillRect(drawX + drawW - handleSize/2, drawY + drawH - handleSize/2, handleSize, handleSize);
+        }
+      } else {
+        // Frame border - active: blue, inactive: red
+        ctx.strokeStyle = isSelected ? '#bb9af7' : frame.isActive ? '#7aa2f7' : '#f43f5e';
+        ctx.lineWidth = isSelected ? 3 : frame.isActive ? 2 : 3;
+        
+        // Draw solid border
+        ctx.strokeRect(frame.x, frame.y, frame.w, frame.h);
+        
+        // Selected frame highlighting
+        if (isSelected) {
+          // Outer glow effect
+          ctx.strokeStyle = 'rgba(187, 154, 247, 0.4)';
+          ctx.lineWidth = 6;
+          ctx.strokeRect(frame.x - 2, frame.y - 2, frame.w + 4, frame.h + 4);
+          
+          // Inner highlight
+          ctx.strokeStyle = '#bb9af7';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(frame.x + 2, frame.y + 2, frame.w - 4, frame.h - 4);
+          
+          // Draw resize handles for selected frame
+          ctx.fillStyle = '#bb9af7';
+          const handleSize = 10;
+          // Top-left
+          ctx.fillRect(frame.x - handleSize/2, frame.y - handleSize/2, handleSize, handleSize);
+          // Top-right
+          ctx.fillRect(frame.x + frame.w - handleSize/2, frame.y - handleSize/2, handleSize, handleSize);
+          // Bottom-left
+          ctx.fillRect(frame.x - handleSize/2, frame.y + frame.h - handleSize/2, handleSize, handleSize);
+          // Bottom-right
+          ctx.fillRect(frame.x + frame.w - handleSize/2, frame.y + frame.h - handleSize/2, handleSize, handleSize);
+        }
+        
+        // Draw delete button (X) in top-right corner for manual frames
+        if (isManual) {
+          const deleteBtnSize = 16;
+          const deleteBtnX = frame.x + frame.w - deleteBtnSize - 2;
+          const deleteBtnY = frame.y + 2;
+          
+          // Delete button background (circular)
+          ctx.beginPath();
+          ctx.arc(deleteBtnX + deleteBtnSize/2, deleteBtnY + deleteBtnSize/2, deleteBtnSize/2, 0, Math.PI * 2);
+          ctx.fillStyle = '#f43f5e';
+          ctx.fill();
+          
+          // X mark
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(deleteBtnX + 4, deleteBtnY + 4);
+          ctx.lineTo(deleteBtnX + deleteBtnSize - 4, deleteBtnY + deleteBtnSize - 4);
+          ctx.moveTo(deleteBtnX + deleteBtnSize - 4, deleteBtnY + 4);
+          ctx.lineTo(deleteBtnX + 4, deleteBtnY + deleteBtnSize - 4);
+          ctx.stroke();
+        }
+        
+        // Draw X mark for inactive frames
+        if (!frame.isActive) {
+          ctx.strokeStyle = '#f43f5e';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(frame.x + 4, frame.y + 4);
+          ctx.lineTo(frame.x + frame.w - 4, frame.y + frame.h - 4);
+          ctx.moveTo(frame.x + frame.w - 4, frame.y + 4);
+          ctx.lineTo(frame.x + 4, frame.y + frame.h - 4);
+          ctx.stroke();
+        }
+        
+        // Frame number for active frames
+        if (frame.isActive) {
+          ctx.fillStyle = isSelected ? '#bb9af7' : '#7aa2f7';
+          ctx.font = isSelected ? 'bold 14px sans-serif' : '12px sans-serif';
+          ctx.fillText(String(frame.index + 1), frame.x + 4, frame.y + (isSelected ? 18 : 14));
+        }
       }
     });
     
     ctx.restore();
-  }, [state.image, state.imageDimensions, state.frames, state.manualFrames, state.zoom, state.selectedManualFrameIndex, state.currentFrame, state.isManualMode]);
+  }, [state.image, state.imageDimensions, state.frames, state.manualFrames, state.zoom, state.selectedManualFrameIndex, state.currentFrame, state.isManualMode, state.isDrawing, state.drawStartX, state.drawStartY, state.drawCurrentX, state.drawCurrentY, marchingAntsOffset]);
 
   // Draw preview canvas
   useEffect(() => {
@@ -239,10 +360,29 @@ function App() {
       return;
     }
     
-    // Check if clicking on existing frame - use viewModel to get latest frames
+    // Check if clicking on delete button (X) for manual frames
     const allFrames = viewModel.getFrames();
     const manualFrameCount = state.frames.length;
     
+    for (let i = allFrames.length - 1; i >= manualFrameCount; i--) {
+      const f = allFrames[i];
+      const deleteBtnSize = 16;
+      const deleteBtnX = f.x + f.w - deleteBtnSize - 2;
+      const deleteBtnY = f.y + 2;
+      
+      // Check if clicking on delete button (circular area)
+      const dx = pos.x - (deleteBtnX + deleteBtnSize/2);
+      const dy = pos.y - (deleteBtnY + deleteBtnSize/2);
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      
+      if (dist <= deleteBtnSize/2) {
+        // Delete the frame
+        viewModel.deleteManualFrame(i - manualFrameCount);
+        return;
+      }
+    }
+    
+    // Check if clicking on existing frame - use viewModel to get latest frames
     for (let i = allFrames.length - 1; i >= manualFrameCount; i--) {
       const f = allFrames[i];
       if (pos.x >= f.x && pos.x <= f.x + f.w && pos.y >= f.y && pos.y <= f.y + f.h) {
@@ -641,50 +781,22 @@ function App() {
         </main>
       </div>
 
-      {/* Frame Gallery */}
-      <div className="gallery" id="framesGallery">
-        {!state.isImageLoaded ? (
-          <p className="gallery-empty">Henüz kare oluşturulmadı.</p>
-        ) : viewModel.getFrames().length === 0 ? (
-          <p className="gallery-empty">Henüz kare oluşturulmadı.</p>
-        ) : (
-          viewModel.getFrames().map((frame, index) => (
-            <div
-              key={index}
-              className={`frame-item ${!frame.isActive ? 'frame-item--disabled' : ''}`}
-            >
-              {/* Frame Image - Click to preview */}
-              {state.image && (
-                <img
-                  src={(() => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = frame.w;
-                    canvas.height = frame.h;
-                    const ctx = canvas.getContext('2d')!;
-                    ctx.drawImage(state.image, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
-                    return canvas.toDataURL();
-                  })()}
-                  alt={`Frame ${index + 1}`}
-                  onClick={() => viewModel.previewSingleFrame(index)}
-                  className="frame-item__img"
-                />
-              )}
-              
-              {/* Toggle Button - Separate from image */}
-              <button
-                className={`frame-item__toggle ${!frame.isActive ? 'frame-item__toggle--off' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  viewModel.toggleFrameActive(index);
-                }}
-                title={frame.isActive ? 'Kapat' : 'Aç'}
-              >
-                <i className={`fa-solid ${frame.isActive ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-              </button>
-            </div>
-          ))
-        )}
-      </div>
+      {/* Frame Gallery - Optimized with thumbnail caching */}
+      {/* When manual mode is active, show only manual frames; otherwise show grid frames */}
+      <GallerySection
+        image={state.image}
+        frames={state.isManualMode ? state.manualFrames : state.frames}
+        isImageLoaded={state.isImageLoaded}
+        selectedFrameIndex={state.isManualMode
+          ? (state.selectedManualFrameIndex >= 0 ? state.selectedManualFrameIndex : null)
+          : state.singlePreviewFrameIndex
+        }
+        viewModel={viewModel}
+        isManualMode={state.isManualMode}
+        gridFrameCount={state.frames.length}
+      />
+
+      {/* Settings Modal */}
 
       {/* Settings Modal */}
       {showSettings && (

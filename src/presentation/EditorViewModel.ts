@@ -28,6 +28,13 @@ export interface EditorState {
   isManualMode: boolean;
   selectedManualFrameIndex: number;
   
+  // Drawing State (for real-time visual feedback)
+  isDrawing: boolean;
+  drawStartX: number;
+  drawStartY: number;
+  drawCurrentX: number;
+  drawCurrentY: number;
+  
   // Animation
   currentFrame: number;
   fps: number;
@@ -57,6 +64,11 @@ const DEFAULT_STATE: EditorState = {
   manualFrames: [],
   isManualMode: false,
   selectedManualFrameIndex: -1,
+  isDrawing: false,
+  drawStartX: 0,
+  drawStartY: 0,
+  drawCurrentX: 0,
+  drawCurrentY: 0,
   currentFrame: 0,
   fps: 8,
   isPlaying: false,
@@ -77,6 +89,8 @@ export class EditorViewModel {
   private _isDragging = false;
   private drawStartX = 0;
   private drawStartY = 0;
+  private currentDrawEndX = 0;
+  private currentDrawEndY = 0;
   private dragStartX = 0;
   private dragStartY = 0;
   private resizeHandle: 'tl' | 'tr' | 'bl' | 'br' | null = null;
@@ -203,6 +217,27 @@ export class EditorViewModel {
     this.notify();
   }
 
+  deleteManualFrame(index: number): void {
+    if (index >= 0 && index < this.state.manualFrames.length) {
+      // Remove the frame at the specified index
+      this.state.manualFrames.splice(index, 1);
+      
+      // Update indices of remaining frames
+      this.state.manualFrames.forEach((frame, i) => {
+        frame.index = i;
+      });
+      
+      // Adjust selected index if necessary
+      if (this.state.selectedManualFrameIndex === index) {
+        this.state.selectedManualFrameIndex = -1;
+      } else if (this.state.selectedManualFrameIndex > index) {
+        this.state.selectedManualFrameIndex--;
+      }
+      
+      this.notify();
+    }
+  }
+
   getResizeHandle(x: number, y: number): 'tl' | 'tr' | 'bl' | 'br' | null {
     const index = this.state.selectedManualFrameIndex;
     if (index < 0 || index >= this.state.manualFrames.length) return null;
@@ -327,26 +362,63 @@ export class EditorViewModel {
     return this._isDragging;
   }
   
+  getDrawingState(): { isDrawing: boolean; startX: number; startY: number; currentX: number; currentY: number } | null {
+    if (!this._isDrawing) return null;
+    return {
+      isDrawing: this._isDrawing,
+      startX: this.drawStartX,
+      startY: this.drawStartY,
+      currentX: this.currentDrawEndX,
+      currentY: this.currentDrawEndY,
+    };
+  }
+  
   startDrawing(x: number, y: number): void {
     this._isDrawing = true;
     this.drawStartX = x;
     this.drawStartY = y;
+    this.currentDrawEndX = x;
+    this.currentDrawEndY = y;
+    
+    // Update drawing state in state for UI feedback
+    this.state.isDrawing = true;
+    this.state.drawStartX = x;
+    this.state.drawStartY = y;
+    this.state.drawCurrentX = x;
+    this.state.drawCurrentY = y;
     
     // Create a new manual frame to draw
+    // Create new array to trigger React re-render
     const frame = createManualFrame(x, y, x, y, this.state.manualFrames.length);
-    this.state.manualFrames.push(frame);
+    this.state.manualFrames = [...this.state.manualFrames, frame];
     this.notify();
   }
   
   updateDrawing(x: number, y: number): void {
     if (!this._isDrawing) return;
     
-    // Update the last manual frame being drawing
+    // Update current drawing coordinates for real-time feedback
+    this.currentDrawEndX = x;
+    this.currentDrawEndY = y;
+    
+    // Update drawing state
+    this.state.drawCurrentX = x;
+    this.state.drawCurrentY = y;
+    
+    // Update the last manual frame being drawn
     const lastIndex = this.state.manualFrames.length - 1;
     if (lastIndex >= 0) {
-      const frame = this.state.manualFrames[lastIndex];
-      frame.w = x - this.drawStartX;
-      frame.h = y - this.drawStartY;
+      // Create new array and frame object to trigger React re-render
+      const currentFrame = this.state.manualFrames[lastIndex];
+      const updatedFrame = {
+        ...currentFrame,
+        w: x - this.drawStartX,
+        h: y - this.drawStartY,
+      };
+      this.state.manualFrames = [
+        ...this.state.manualFrames.slice(0, lastIndex),
+        updatedFrame,
+      ];
       this.notify();
     }
   }
@@ -359,22 +431,28 @@ export class EditorViewModel {
     if (lastIndex >= 0) {
       const frame = this.state.manualFrames[lastIndex];
       if (Math.abs(frame.w) < 5 || Math.abs(frame.h) < 5) {
-        // Remove too small frames
-        this.state.manualFrames.pop();
+        // Remove too small frames by creating new array
+        this.state.manualFrames = this.state.manualFrames.slice(0, lastIndex);
       } else {
-        // Normalize negative dimensions
+        // Normalize negative dimensions by creating new frame object
+        let normalizedFrame = { ...frame };
         if (frame.w < 0) {
-          frame.x += frame.w;
-          frame.w = Math.abs(frame.w);
+          normalizedFrame.x += frame.w;
+          normalizedFrame.w = Math.abs(frame.w);
         }
         if (frame.h < 0) {
-          frame.y += frame.h;
-          frame.h = Math.abs(frame.h);
+          normalizedFrame.y += frame.h;
+          normalizedFrame.h = Math.abs(frame.h);
         }
+        this.state.manualFrames = [
+          ...this.state.manualFrames.slice(0, lastIndex),
+          normalizedFrame,
+        ];
       }
     }
     
     this._isDrawing = false;
+    this.state.isDrawing = false;
     this.notify();
   }
   
@@ -386,11 +464,13 @@ export class EditorViewModel {
     if (lastIndex >= 0) {
       const frame = this.state.manualFrames[lastIndex];
       if (frame.w === 0 && frame.h === 0) {
-        this.state.manualFrames.pop();
+        // Create new array without the last frame
+        this.state.manualFrames = this.state.manualFrames.slice(0, lastIndex);
       }
     }
     
     this._isDrawing = false;
+    this.state.isDrawing = false;
     this.notify();
   }
   
@@ -409,8 +489,18 @@ export class EditorViewModel {
       const dx = x - this.dragStartX;
       const dy = y - this.dragStartY;
       
-      frame.x += dx;
-      frame.y += dy;
+      // Create new frame object and array to trigger React re-render
+      const updatedFrame = {
+        ...frame,
+        x: frame.x + dx,
+        y: frame.y + dy,
+      };
+      
+      this.state.manualFrames = [
+        ...this.state.manualFrames.slice(0, index),
+        updatedFrame,
+        ...this.state.manualFrames.slice(index + 1),
+      ];
       
       this.dragStartX = x;
       this.dragStartY = y;
@@ -444,24 +534,34 @@ export class EditorViewModel {
     const dx = x - this.dragStartX;
     const dy = y - this.dragStartY;
     
+    // Create new frame object to trigger React re-render
+    let updatedFrame = { ...frame };
+    
     if (this.resizeHandle?.includes('l')) {
-      frame.x = this.initialFrameState.x + dx;
-      frame.w = this.initialFrameState.w - dx;
+      updatedFrame.x = this.initialFrameState.x + dx;
+      updatedFrame.w = this.initialFrameState.w - dx;
     }
     if (this.resizeHandle?.includes('r')) {
-      frame.w = this.initialFrameState.w + dx;
+      updatedFrame.w = this.initialFrameState.w + dx;
     }
     if (this.resizeHandle?.includes('t')) {
-      frame.y = this.initialFrameState.y + dy;
-      frame.h = this.initialFrameState.h - dy;
+      updatedFrame.y = this.initialFrameState.y + dy;
+      updatedFrame.h = this.initialFrameState.h - dy;
     }
     if (this.resizeHandle?.includes('b')) {
-      frame.h = this.initialFrameState.h + dy;
+      updatedFrame.h = this.initialFrameState.h + dy;
     }
     
     // Minimum size protection
-    if (frame.w < 5) frame.w = 5;
-    if (frame.h < 5) frame.h = 5;
+    if (updatedFrame.w < 5) updatedFrame.w = 5;
+    if (updatedFrame.h < 5) updatedFrame.h = 5;
+    
+    // Create new array to trigger React re-render
+    this.state.manualFrames = [
+      ...this.state.manualFrames.slice(0, index),
+      updatedFrame,
+      ...this.state.manualFrames.slice(index + 1),
+    ];
     
     this.notify();
   }
