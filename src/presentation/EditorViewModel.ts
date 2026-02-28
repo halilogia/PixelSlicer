@@ -32,6 +32,7 @@ export interface EditorState {
   currentFrame: number;
   fps: number;
   isPlaying: boolean;
+  singlePreviewFrameIndex: number | null; // For previewing a single frame
   
   // Zoom
   zoom: number;
@@ -59,6 +60,7 @@ const DEFAULT_STATE: EditorState = {
   currentFrame: 0,
   fps: 8,
   isPlaying: false,
+  singlePreviewFrameIndex: null,
   zoom: 1,
   previewZoom: -1, // -1 means auto-fit
   sheetColumns: 8,
@@ -68,6 +70,17 @@ export class EditorViewModel {
   private state: EditorState;
   private listeners: Set<StateListener> = new Set();
   private animationInterval: number | null = null;
+  
+  // Drawing/Resize/Drag state
+  private _isDrawing = false;
+  private _isResizing = false;
+  private _isDragging = false;
+  private drawStartX = 0;
+  private drawStartY = 0;
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private resizeHandle: 'tl' | 'tr' | 'bl' | 'br' | null = null;
+  private initialFrameState: Frame | null = null;
 
   constructor() {
     this.state = { ...DEFAULT_STATE };
@@ -83,6 +96,10 @@ export class EditorViewModel {
   }
 
   getActiveFrames(): Frame[] {
+    // When manual mode is on, only show manual frames
+    if (this.state.isManualMode) {
+      return this.state.manualFrames.filter(f => f.isActive);
+    }
     return this.getFrames().filter(f => f.isActive);
   }
 
@@ -197,16 +214,20 @@ export class EditorViewModel {
   toggleFrameActive(index: number): void {
     const allFrames = this.getFrames();
     if (index >= 0 && index < allFrames.length) {
-      allFrames[index].isActive = !allFrames[index].isActive;
+      const newIsActive = !allFrames[index].isActive;
       
-      // Sync back to source arrays
+      // Create new arrays to trigger React re-render
       if (index < this.state.frames.length) {
-        this.state.frames[index].isActive = allFrames[index].isActive;
+        // It's a grid frame
+        this.state.frames = this.state.frames.map((f, i) =>
+          i === index ? { ...f, isActive: newIsActive } : f
+        );
       } else {
+        // It's a manual frame
         const manualIndex = index - this.state.frames.length;
-        if (manualIndex >= 0 && manualIndex < this.state.manualFrames.length) {
-          this.state.manualFrames[manualIndex].isActive = allFrames[index].isActive;
-        }
+        this.state.manualFrames = this.state.manualFrames.map((f, i) =>
+          i === manualIndex ? { ...f, isActive: newIsActive } : f
+        );
       }
       
       this.notify();
@@ -266,6 +287,18 @@ export class EditorViewModel {
     this.notify();
   }
 
+  // Preview single frame (when clicking on gallery item)
+  previewSingleFrame(index: number): void {
+    this.stopAnimation();
+    this.state.singlePreviewFrameIndex = index;
+    this.notify();
+  }
+
+  clearSinglePreview(): void {
+    this.state.singlePreviewFrameIndex = null;
+    this.notify();
+  }
+
   // Export settings
   setSheetColumns(columns: number): void {
     this.state.sheetColumns = Math.max(1, columns);
@@ -278,6 +311,165 @@ export class EditorViewModel {
     this.state.gridConfig.offsetY = 0;
     this.state.gridConfig.padding = 0;
     this.recalculateFrames();
+    this.notify();
+  }
+
+  // Drawing state management
+  isDrawing(): boolean {
+    return this._isDrawing;
+  }
+  
+  isResizing(): boolean {
+    return this._isResizing;
+  }
+  
+  isDragging(): boolean {
+    return this._isDragging;
+  }
+  
+  startDrawing(x: number, y: number): void {
+    this._isDrawing = true;
+    this.drawStartX = x;
+    this.drawStartY = y;
+    
+    // Create a new manual frame to draw
+    const frame = createManualFrame(x, y, x, y, this.state.manualFrames.length);
+    this.state.manualFrames.push(frame);
+    this.notify();
+  }
+  
+  updateDrawing(x: number, y: number): void {
+    if (!this._isDrawing) return;
+    
+    // Update the last manual frame being drawing
+    const lastIndex = this.state.manualFrames.length - 1;
+    if (lastIndex >= 0) {
+      const frame = this.state.manualFrames[lastIndex];
+      frame.w = x - this.drawStartX;
+      frame.h = y - this.drawStartY;
+      this.notify();
+    }
+  }
+  
+  endDrawing(): void {
+    if (!this._isDrawing) return;
+    
+    // Clean up invalid frames (too small)
+    const lastIndex = this.state.manualFrames.length - 1;
+    if (lastIndex >= 0) {
+      const frame = this.state.manualFrames[lastIndex];
+      if (Math.abs(frame.w) < 5 || Math.abs(frame.h) < 5) {
+        // Remove too small frames
+        this.state.manualFrames.pop();
+      } else {
+        // Normalize negative dimensions
+        if (frame.w < 0) {
+          frame.x += frame.w;
+          frame.w = Math.abs(frame.w);
+        }
+        if (frame.h < 0) {
+          frame.y += frame.h;
+          frame.h = Math.abs(frame.h);
+        }
+      }
+    }
+    
+    this._isDrawing = false;
+    this.notify();
+  }
+  
+  cancelDrawing(): void {
+    if (!this._isDrawing) return;
+    
+    // Remove the incomplete frame
+    const lastIndex = this.state.manualFrames.length - 1;
+    if (lastIndex >= 0) {
+      const frame = this.state.manualFrames[lastIndex];
+      if (frame.w === 0 && frame.h === 0) {
+        this.state.manualFrames.pop();
+      }
+    }
+    
+    this._isDrawing = false;
+    this.notify();
+  }
+  
+  startDrag(x: number, y: number): void {
+    this._isDragging = true;
+    this.dragStartX = x;
+    this.dragStartY = y;
+  }
+  
+  updateDrag(x: number, y: number): void {
+    if (!this._isDragging) return;
+    
+    const index = this.state.selectedManualFrameIndex;
+    if (index >= 0 && index < this.state.manualFrames.length) {
+      const frame = this.state.manualFrames[index];
+      const dx = x - this.dragStartX;
+      const dy = y - this.dragStartY;
+      
+      frame.x += dx;
+      frame.y += dy;
+      
+      this.dragStartX = x;
+      this.dragStartY = y;
+      this.notify();
+    }
+  }
+  
+  endDrag(): void {
+    this._isDragging = false;
+    this.notify();
+  }
+  
+  startResize(handle: 'tl' | 'tr' | 'bl' | 'br', x: number, y: number): void {
+    const index = this.state.selectedManualFrameIndex;
+    if (index < 0 || index >= this.state.manualFrames.length) return;
+    
+    this._isResizing = true;
+    this.resizeHandle = handle;
+    this.initialFrameState = { ...this.state.manualFrames[index] };
+    this.dragStartX = x;
+    this.dragStartY = y;
+  }
+  
+  updateResize(x: number, y: number): void {
+    if (!this._isResizing || !this.initialFrameState) return;
+    
+    const index = this.state.selectedManualFrameIndex;
+    if (index < 0 || index >= this.state.manualFrames.length) return;
+    
+    const frame = this.state.manualFrames[index];
+    const dx = x - this.dragStartX;
+    const dy = y - this.dragStartY;
+    
+    if (this.resizeHandle?.includes('l')) {
+      frame.x = this.initialFrameState.x + dx;
+      frame.w = this.initialFrameState.w - dx;
+    }
+    if (this.resizeHandle?.includes('r')) {
+      frame.w = this.initialFrameState.w + dx;
+    }
+    if (this.resizeHandle?.includes('t')) {
+      frame.y = this.initialFrameState.y + dy;
+      frame.h = this.initialFrameState.h - dy;
+    }
+    if (this.resizeHandle?.includes('b')) {
+      frame.h = this.initialFrameState.h + dy;
+    }
+    
+    // Minimum size protection
+    if (frame.w < 5) frame.w = 5;
+    if (frame.h < 5) frame.h = 5;
+    
+    this.notify();
+  }
+  
+  endResize(): void {
+    this._isResizing = false;
+    this.resizeHandle = null;
+    this.initialFrameState = null;
     this.notify();
   }
 
