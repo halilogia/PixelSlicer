@@ -42,5 +42,5 @@ docs/
 archive/
 brain/
 Universal-Docs/
-agent/
-snapshots/
+.snapshots/
+.agent/
