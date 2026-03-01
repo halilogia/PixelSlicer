@@ -41,7 +41,7 @@ _(Buraya projenizin ekran görüntüsünü ekleyebilirsiniz)_
 
 ## 🌐 Demo
 
-Projeyi canlı denemek için: [GitHub Pages Linkiniz Buraya]
+Projeyi canlı denemek için: https://halilogia.github.io/PixelSlicer/
 
 ## 🤝 Katkıda Bulunma
 
@@ -58,3 +58,4 @@ Bu proje **MIT Lisansı** ile lisanslanmıştır. Özgürce kullanabilir, deği�
 ---
 
 > **Geliştirici Notu**: Bu araç, oyun geliştirme süreçlerindeki "Animation Hell" (Animasyon Cehennemi) sürecini hafifletmek amacıyla yapılmıştır. 🎮
+
