@@ -779,3 +779,41 @@ const handleGifUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement
 **Report Generated:** 2026-02-28  
 **Project:** PixelSlicer v2.0.0  
 **Auditor:** Kilo Code Optimization Engine
+
+
+## OPTIMIZATIONS.md İşlemlerinin Durum Kontrolü
+
+Aşağıda [`OPTIMIZATIONS.md`](OPTIMIZATIONS.md:1) dosyasındaki tüm optimizasyonların mevcut koddaki uygulama durumunu bulabilirsiniz:
+
+### ✅ Uygulanmış Optimizasyonlar
+
+| ID | Optimizasyon | Durum |
+|----|--------------|-------|
+| **F-001** | Frame Gallery Canvas Oluşturma | ✅ **Uygulandı** - [`useFrameThumbnails.ts`](src/hooks/useFrameThumbnails.ts:1) hook'u kullanılarak thumbnail'ler cache'lendi, [`GallerySection.tsx`](src/components/GallerySection.tsx:1) ve [`FrameThumbnail.tsx`](src/components/FrameThumbnail.tsx:1) ile memoization yapıldı |
+| **F-004** | Canvas Pool | ✅ **Uygulandı** - [`useFrameThumbnails.ts`](src/hooks/useFrameThumbnails.ts:45) içinde her thumbnail için yeni canvas oluşturuluyor (resize sorununu önlemek için) |
+
+### ⚠️ Kısmen Uygulanmış Optimizasyonlar
+
+| ID | Optimizasyon | Durum | Notlar |
+|----|--------------|-------|--------|
+| **F-002** | URL.createObjectURL Memory Leak | ⚠️ **Kısmen** - [`useFrameThumbnails.ts`](src/hooks/useFrameThumbnails.ts:167) unmount'ta temizlik var, ancak [`App.tsx`](src/App.tsx:254) `handleImageUpload` ve satır 758-760 `onDrop` handler'da **hâlâ URL.revokeObjectURL yok** |
+| **F-005** | GIF Frame Canvas'ları | ⚠️ **Kısmen** - [`handleGifUpload`](src/App.tsx:262) içinde hâlâ her frame için yeni canvas oluşturuluyor (satır 278-283), tek canvas ile direkt `putImageData` önerisi uygulanmamış |
+| **F-006** | UseEffect Dependency Bloat | ⚠️ **Kısmen** - [`App.tsx`](src/App.tsx:55) canvas çizim useEffect hâlâ 11 dependency içeriyor, visual state ayrımı yapılmamış |
+
+### ❌ Uygulanmamış Optimizasyonlar
+
+| ID | Optimizasyon | Durum | Etki |
+|----|--------------|-------|------|
+| **F-003** | ViewModel Subscription | ❌ Uygulanmadı - [`EditorViewModel.ts`](src/presentation/EditorViewModel.ts:121) hâlâ tüm state değişikliklerinde tüm component tree'i re-render ediyor, selector-based subscription yok |
+| **F-007** | ViewModel Array Spread | ❌ Uygulanmadı - [`getFrames()`](src/presentation/EditorViewModel.ts:108) ve [`getActiveFrames()`](src/presentation/EditorViewModel.ts:112) her çağrıda yeni array oluşturuyor, cache/memoization yok |
+| **F-008** | Canvas Font Batching | ❌ Uygulanmadı - [`App.tsx`](src/App.tsx:192) `ctx.font` ve `ctx.fillStyle` her frame'de tekrar set ediliyor, batching yapılmamış |
+| **F-009** | RAF Animation | ❌ Uygulanmadı - [`EditorViewModel.ts`](src/presentation/EditorViewModel.ts:300) `setInterval` kullanılıyor, `requestAnimationFrame` önerisi uygulanmamış |
+| **F-010** | Sprite Sheet Hesaplama Hatası | ❌ Uygulanmadı - [`ExportService.ts`](src/infrastructure/ExportService.ts:69-70) `maxWidth` hesaplamasında hâlâ `frame.x + frame.w` kullanılıyor, düzeltme yapılmamış |
+
+### Özet
+
+- **Tamamlanan:** 2/10
+- **Kısmen Tamamlanan:** 3/10
+- **Tamamlanmamış:** 5/10
+
+**Öncelikli düzeltmeler:** F-002 (memory leak), F-010 (hesaplama hatası), F-009 (animasyon performansı)
