@@ -37,8 +37,10 @@ build/
 .env.*.local
 
 
-.agent
-.Universal-Docs
-.Docs
-.archive
-.brain
+# Project Knowledge & Docs
+docs/
+archive/
+brain/
+Universal-Docs/
+agent/
+snapshots/

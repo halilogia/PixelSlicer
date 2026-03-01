@@ -1,5 +1,6 @@
-# Git Divergence Resolution Task
+# Git Deletion & Ignore Sync Task
 
-- [/] Provide commands to sync deletions <!-- id: 3 -->
-- [ ] User executes commands <!-- id: 4 -->
-- [ ] Verify GitHub reflection <!-- id: 5 -->
+- [/] Fix .gitignore naming errors (remove leading dots) <!-- id: 7 -->
+- [ ] Remove folders from Git index (keeping local copies) <!-- id: 8 -->
+- [ ] Commit and Push changes to GitHub <!-- id: 9 -->
+- [ ] Verify GitHub reflection <!-- id: 10 -->

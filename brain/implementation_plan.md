@@ -1,39 +1,29 @@
-# Deletion Sync Plan
+# GitHub Klasör Temizleme Planı (Kesin Çözüm)
 
-Yerel olarak sildiğiniz dosyaların GitHub'da görünmeye devam etmesinin sebebi, bu silme işleminin Git'e bildirilmemiş (stage ve commit edilmemiş) olmasıdır.
+Az önceki komutların işe yaramamasının sebebi `.gitignore` dosyasında klasör isimlerinin başında fazladan nokta (`.`) olmasıdır (Örn: `.docs` yerine `docs/` olmalı). Bu yüzden Git bu klasörleri "yok sayılması gerekenler" listesine dahil edemiyordu.
 
-## Adımlar
+## Yapılacak İşlemler
 
-### 1. Durumu Kontrol Edin
-Hangi dosyaların silindiğini görmek için:
+### 1. .gitignore Dosyasını Düzeltme
+Dosyanızdaki isimleri gerçek klasör isimleriyle eşleştireceğiz.
+
+### 2. Git Belleğini (Index) Temizleme ve Yeniden Yükleme
+Bu komutlar klasörleri bilgisayarınızdan silmez, sadece GitHub'dan kaldırır.
+
 ```bash
-git status
-```
-
-### 2. Silinen Dosyaları Git'e Bildirin
-Eğer tüm silinen dosyaları ve değişiklikleri toplu olarak eklemek isterseniz:
-```bash
-git add -A
-```
-*(Veya sadece silinenleri işaretlemek için `git add -u` kullanabilirsiniz)*
-
-### 3. Değişiklikleri Kaydedin (Commit)
-```bash
-git commit -m "docs: remove deleted folders from repository"
-```
-
-### 4. GitHub'a Gönderin (Push)
-```bash
-git push origin main
-```
-
-## Önemli Not: .gitignore Durumu
-Eğer bu klasörleri `.gitignore` dosyasına yeni eklediyseniz, Git hala eski "index" kaydını tutuyor olabilir. Bu durumda şu komutu kullanmanız gerekebilir:
-```bash
+# Git'in şu an takip ettiği her şeyi bellekten çıkar (Dosyalar silinmez!)
 git rm -r --cached .
+
+# Her şeyi tekrar ekle (Bu sefer yeni .gitignore kuralları uygulanacak)
 git add .
-git commit -m "fix: sync .gitignore with repository"
+
+# Değişiklikleri kaydet
+git commit -m "fix: correctly ignore and remove docs, brain, archive folders"
+
+# GitHub'a gönder
 git push origin main
 ```
 
-⚠️ **Uyarı**: `git rm -r --cached .` komutu her şeyi geçici olarak unutturur, sonra `git add .` ile sadece `.gitignore`'da olmayanlar geri eklenir. Güvenli bir yöntemdir ancak commit mesajınızda belirtmek iyidir.
+---
+
+⚠️ **ÖNEMLİ**: Bu işlemi yaptıktan sonra GitHub sayfasını yenilediğinizde `docs`, `brain` ve `archive` klasörlerinin kaybolduğunu göreceksiniz. Bilgisayarınızda ise durmaya devam edecekler.
