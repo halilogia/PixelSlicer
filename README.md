@@ -35,13 +35,12 @@ _(Buraya projenizin ekran görüntüsünü ekleyebilirsiniz)_
 ## 🛠️ Kullanılan Teknolojiler
 
 - **HTML5 Canvas API**: Görüntü işleme ve çizim için.
-- **Tailwind CSS**: Modern ve duyarlı (responsive) arayüz tasarımı için.
 - **JSZip**: Tarayıcı tarafında ZIP dosyası oluşturmak için.
 - **FontAwesome**: İkonlar için.
 
 ## 🌐 Demo
 
-Projeyi canlı denemek için: [GitHub Pages Linkiniz Buraya]
+Projeyi canlı denemek için: https://halilogia.github.io/PixelSlicer/
 
 ## 🤝 Katkıda Bulunma
 
@@ -58,3 +57,5 @@ Bu proje **MIT Lisansı** ile lisanslanmıştır. Özgürce kullanabilir, deği�
 ---
 
 > **Geliştirici Notu**: Bu araç, oyun geliştirme süreçlerindeki "Animation Hell" (Animasyon Cehennemi) sürecini hafifletmek amacıyla yapılmıştır. 🎮
+
+
