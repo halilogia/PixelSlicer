@@ -39,3 +39,6 @@ build/
 
 .agent
 .Universal-Docs
+.Docs
+.archive
+.brain
