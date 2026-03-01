@@ -28,6 +28,7 @@ export function useFrameThumbnails(
   // Refs for version tracking
   const frameVersionsRef = useRef<Map<number, number>>(new Map());
   const pendingUpdateRef = useRef<number | null>(null);
+  const lastImageRef = useRef<HTMLImageElement | null>(null);
 
   // Generate thumbnail for single frame - creates fresh canvas to avoid resize issues
   const generateThumbnail = useCallback((
@@ -68,8 +69,19 @@ export function useFrameThumbnails(
   thumbnailsRef.current = thumbnails;
   
   useEffect(() => {
+    // RESET CACHE ON IMAGE CHANGE
+    // If the image reference changes, we must invalidate all thumbnails
+    // because frame dimensions might be identical but the content is different
+    if (lastImageRef.current !== image) {
+      if (thumbnailsRef.current.size > 0) {
+        setThumbnails(new Map());
+        frameVersionsRef.current = new Map();
+      }
+      lastImageRef.current = image;
+      // Don't return here, continue to schedule the new update in this same render
+    }
+
     if (!image || frames.length === 0) {
-      // Clear thumbnails when no frames
       if (thumbnailsRef.current.size > 0) {
         setThumbnails(new Map());
         frameVersionsRef.current = new Map();
@@ -98,63 +110,85 @@ export function useFrameThumbnails(
     }
     
     // Check for removed frames
-    for (const key of thumbnailsRef.current.keys()) {
-      if (key >= frames.length) {
-        needsUpdate = true;
-        break;
+    if (!needsUpdate) {
+      for (const key of thumbnailsRef.current.keys()) {
+        if (key >= frames.length) {
+          needsUpdate = true;
+          break;
+        }
       }
     }
     
     if (!needsUpdate) return;
 
-    // Schedule batch processing
-    pendingUpdateRef.current = scheduleTask((deadline) => {
-      const newThumbnails = new Map(thumbnailsRef.current);
-      const newVersions = new Map(frameVersionsRef.current);
-      let processedCount = 0;
-      
-      for (let i = 0; i < frames.length; i++) {
-        // Yield to main thread if time is up
-        if (deadline.timeRemaining() <= 0 && processedCount > 0) {
-          // Schedule continuation
-          pendingUpdateRef.current = scheduleTask(() => {
-            // Continue processing remaining frames
-            setThumbnails(newThumbnails);
-            frameVersionsRef.current = newVersions;
+    // Batch thumbnail generation using scheduleTask (requestIdleCallback with Safari fallback)
+    const processBatch = (startIndex: number) => {
+      pendingUpdateRef.current = scheduleTask((deadline) => {
+        let currentIndex = startIndex;
+        const batchThumbnails = new Map<number, string>();
+        const batchVersions = new Map<number, number>();
+        let processedInThisBatch = 0;
+
+        // Inner loop to process as many frames as possible in this idle period
+        while (currentIndex < frames.length && (deadline.timeRemaining() > 0 || processedInThisBatch === 0)) {
+          const frame = frames[currentIndex];
+          
+          // Basic validation to avoid DOM errors
+          if (frame.w > 0 && frame.h > 0) {
+            const currentVersion = frame.x + frame.y + frame.w + frame.h + (frame.isActive ? 1 : 0);
+            const cachedVersion = frameVersionsRef.current.get(currentIndex);
+            
+            // Generate if changed or missing
+            if (cachedVersion !== currentVersion || !thumbnailsRef.current.has(currentIndex)) {
+              try {
+                const thumbnailUrl = generateThumbnail(frame);
+                batchThumbnails.set(currentIndex, thumbnailUrl);
+                batchVersions.set(currentIndex, currentVersion);
+                processedInThisBatch++;
+              } catch (err) {
+                console.error('Failed to generate thumbnail for frame', currentIndex, err);
+              }
+            }
+          }
+          
+          currentIndex++;
+        }
+
+        // UPDATE STATE ONCE PER IDLE PERIOD
+        if (processedInThisBatch > 0) {
+          setThumbnails(prev => {
+            const next = new Map(prev);
+            batchThumbnails.forEach((url, idx) => next.set(idx, url));
+            return next;
           });
-          return;
+          
+          // Update versions ref alongside state
+          batchVersions.forEach((ver, idx) => frameVersionsRef.current.set(idx, ver));
         }
 
-        const frame = frames[i];
-        const currentVersion = frame.x + frame.y + frame.w + frame.h + (frame.isActive ? 1 : 0);
-        const cachedVersion = newVersions.get(i);
-        
-        // Skip if unchanged
-        if (cachedVersion === currentVersion && newThumbnails.has(i)) {
-          continue;
+        if (currentIndex < frames.length) {
+          // More frames to process, schedule NEXT idle period
+          processBatch(currentIndex);
+        } else {
+          // All done, clean up removed frames if necessary
+          setThumbnails(prev => {
+            let hasRemoved = false;
+            const next = new Map(prev);
+            for (const key of next.keys()) {
+              if (key >= frames.length) {
+                next.delete(key);
+                frameVersionsRef.current.delete(key);
+                hasRemoved = true;
+              }
+            }
+            return hasRemoved ? next : prev;
+          });
+          pendingUpdateRef.current = null;
         }
+      }, { timeout: 100 });
+    };
 
-        try {
-          const thumbnailUrl = generateThumbnail(frame);
-          newThumbnails.set(i, thumbnailUrl);
-          newVersions.set(i, currentVersion);
-          processedCount++;
-        } catch (err) {
-          console.error('Failed to generate thumbnail for frame', i, err);
-        }
-      }
-
-      // Clean up removed frames
-      for (const key of newThumbnails.keys()) {
-        if (key >= frames.length) {
-          newThumbnails.delete(key);
-          newVersions.delete(key);
-        }
-      }
-
-      setThumbnails(newThumbnails);
-      frameVersionsRef.current = newVersions;
-    }, { timeout: 100 });
+    processBatch(0);
 
     return () => {
       if (pendingUpdateRef.current !== null) {

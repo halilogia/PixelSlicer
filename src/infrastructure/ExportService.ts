@@ -100,6 +100,31 @@ export async function exportAsSpriteSheet(
 }
 
 /**
+ * Export a single frame as PNG
+ */
+export async function exportSingleFrame(
+  image: HTMLImageElement,
+  frame: Frame
+): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+
+  canvas.width = frame.w;
+  canvas.height = frame.h;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(
+    image,
+    frame.x, frame.y, frame.w, frame.h,
+    0, 0, frame.w, frame.h
+  );
+
+  return new Promise<Blob>((resolve) => {
+    canvas.toBlob((blob) => resolve(blob!), 'image/png');
+  });
+}
+
+/**
  * Trigger file download
  */
 export function downloadBlob(blob: Blob, filename: string): void {

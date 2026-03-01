@@ -12,6 +12,7 @@ interface FrameThumbnailProps {
   isSelected: boolean;
   onToggle: (index: number) => void;
   onPreview: (index: number) => void;
+  onDownload: (index: number) => void;
 }
 
 // Frame hash calculation (faster than string comparison)
@@ -41,6 +42,7 @@ const FrameThumbnail: React.FC<FrameThumbnailProps> = ({
   isSelected,
   onToggle,
   onPreview,
+  onDownload,
 }) => {
   const handleToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,6 +52,11 @@ const FrameThumbnail: React.FC<FrameThumbnailProps> = ({
   const handlePreview = useCallback(() => {
     onPreview(index);
   }, [index, onPreview]);
+
+  const handleDownload = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDownload(index);
+  }, [index, onDownload]);
 
   // Fallback to inline canvas if thumbnail not ready
   const renderImage = () => {
@@ -138,7 +145,7 @@ const FrameThumbnail: React.FC<FrameThumbnailProps> = ({
         style={{
           position: 'absolute',
           top: '4px',
-          right: '4px',
+          right: '24px',
           backgroundColor: 'rgba(26, 27, 38, 0.8)',
           border: 'none',
           borderRadius: '3px',
@@ -146,9 +153,40 @@ const FrameThumbnail: React.FC<FrameThumbnailProps> = ({
           cursor: 'pointer',
           color: frame.isActive ? '#7aa2f7' : '#565f89',
           transition: 'color 0.15s ease',
+          width: '20px',
+          height: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         <i className={`fa-solid ${frame.isActive ? 'fa-eye-slash' : 'fa-eye'}`} style={{ fontSize: '12px' }} />
+      </button>
+
+      {/* Download Button */}
+      <button
+        className="frame-item__download"
+        onClick={handleDownload}
+        title="İndir"
+        style={{
+          position: 'absolute',
+          top: '4px',
+          right: '4px',
+          backgroundColor: 'rgba(26, 27, 38, 0.8)',
+          border: 'none',
+          borderRadius: '3px',
+          padding: '4px',
+          cursor: 'pointer',
+          color: '#7aa2f7',
+          transition: 'color 0.15s ease',
+          width: '20px',
+          height: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <i className="fa-solid fa-download" style={{ fontSize: '12px' }} />
       </button>
 
       {/* Size Info */}

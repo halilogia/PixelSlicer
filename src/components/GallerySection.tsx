@@ -6,6 +6,7 @@ import type { Frame } from '../domain/FrameLogic';
 import { useFrameThumbnails } from '../hooks/useFrameThumbnails';
 import FrameThumbnail from './FrameThumbnail';
 import { EditorViewModel } from '../presentation/EditorViewModel';
+import { exportSingleFrame, downloadBlob } from '../infrastructure/ExportService';
 
 interface GallerySectionProps {
   image: HTMLImageElement | null;
@@ -47,6 +48,22 @@ const GallerySection: React.FC<GallerySectionProps> = ({
     viewModel.previewSingleFrame(adjustedIndex);
   }, [viewModel, isManualMode, gridFrameCount]);
 
+  const handleDownloadFrame = useCallback(async (index: number) => {
+    if (!image) return;
+    const adjustedIndex = isManualMode ? index + gridFrameCount : index;
+    const allFrames = viewModel.getFrames();
+    const frame = allFrames[adjustedIndex];
+    if (!frame) return;
+
+    try {
+      const blob = await exportSingleFrame(image, frame);
+      const filename = `frame_${String(adjustedIndex + 1).padStart(4, '0')}.png`;
+      downloadBlob(blob, filename);
+    } catch (error) {
+      console.error('Failed to download frame:', error);
+    }
+  }, [image, isManualMode, gridFrameCount, viewModel]);
+
   if (!isImageLoaded) {
     return (
       <div className="gallery" id="framesGallery">
@@ -75,6 +92,7 @@ const GallerySection: React.FC<GallerySectionProps> = ({
           isSelected={selectedFrameIndex === index}
           onToggle={handleToggleFrame}
           onPreview={handlePreviewFrame}
+          onDownload={handleDownloadFrame}
         />
       ))}
     </div>

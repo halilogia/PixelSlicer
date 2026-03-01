@@ -633,7 +633,7 @@ input[type="range"]::-webkit-slider-thumb {
 .frame-item__toggle {
   position: absolute;
   top: 2px;
-  right: 2px;
+  right: 22px;
   width: 20px;
   height: 20px;
   border-radius: var(--radius-sm);
@@ -657,6 +657,37 @@ input[type="range"]::-webkit-slider-thumb {
   background-color: var(--accent-red);
   color: white;
   opacity: 1;
+}
+
+.frame-item__download {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background-color: var(--accent-blue);
+  color: var(--bg-primary);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+}
+
+.frame-item:hover .frame-item__download {
+  opacity: 1;
+}
+
+.frame-item__download:hover {
+  background-color: var(--accent-blue-hover);
+}
+
+.frame-item__download:active {
+  transform: scale(0.95);
 }
 
 .frame-item img {
