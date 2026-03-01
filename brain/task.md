@@ -1,15 +1,5 @@
-# Görev Takibi
+# Git Divergence Resolution Task
 
-## Aktif Görevler
-
-- [ ] Readme'ye demo linki eklenmesi
-- [ ] Ekran görüntüleri/GIF eklenmesi
-
-## Tamamlanan Görevler
-
-- [x] Proje yapısı oluşturuldu
-- [x] Temel sprite dilimleme özellikleri tamamlandı
-- [x] Grid ve Manuel mod eklendi
-- [x] Animasyon önizleme eklendi
-- [x] ZIP export eklendi
-- [x] Zoom & Pan desteği eklendi
+- [x] Analyze local vs remote divergence <!-- id: 0 -->
+- [/] Provide terminal commands to reconcile branches <!-- id: 1 -->
+- [ ] Verify resolution (if user applies) <!-- id: 2 -->

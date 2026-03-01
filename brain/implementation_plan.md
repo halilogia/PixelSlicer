@@ -1,26 +1,40 @@
-# Uygulama Planı
+# Git Divergence Çözüm Planı
 
-## Mevcut Durum
+Bu plan, `git pull` sırasında karşılaştığınız "divergent branches" (ayrışmış dallar) hatasını çözmek için gerekli komutları ve açıklamaları içerir.
 
-PixelSlicer v1.0 stabil ve kullanılabilir durumda. Tüm temel özellikler çalışıyor.
+## Durum Analizi
+Yerel dalınız (`main`) ve uzak dalınız (`origin/main`) birbirinden farklı commit'lere sahip. Git, bu iki dalı nasıl birleştireceğine dair (merge mü, rebase mi?) bir tercih yapmanızı istiyor.
 
-## Hedefler
+## Önerilen Çözümler
 
-1. Kullanıcı deneyimini iyileştirmek
-2. Export seçeneklerini genişletmek
-3. Performans optimizasyonları
+### Seçenek 1: Merge (Birleştirme - En Güvenli)
+Yerel değişikliklerinizi ve uzak sunucudaki değişiklikleri bir "merge commit" ile birleştirir.
+```bash
+git config pull.rebase false
+git pull origin main
+```
 
-## Teknik Kararlar
+### Seçenek 2: Rebase (Yeniden Temellendirme - Daha Temiz Geçmiş)
+Yerel commit'lerinizi uzak sunucudaki güncel commit'lerin üzerine taşır.
+```bash
+git config pull.rebase true
+git pull origin main
+```
 
-| Karar       | Seçim        | Gerekçe                           |
-| ----------- | ------------ | --------------------------------- |
-| Framework   | Vanilla JS   | Basitlik ve hız, bağımlılık yok   |
-| Styling     | Tailwind CSS | Hızlı prototipleme, utility-first |
-| ZIP Library | JSZip        | Tarayıcıda çalışan, güvenilir     |
-| Canvas API  | HTML5 Native | Performans, geniş destek          |
+### Seçenek 3: Sadece Bu Sefer İçin (Yapılandırmayı Değiştirmeden)
+```bash
+git pull --rebase origin main
+# VEYA
+git pull --no-rebase origin main
+```
 
-## Sonraki Adımlar
+## Karar Rehberliğine Göre Öneri
+⚠️ **Risk**: Eğer yerel commit'lerinizle uzak sunucudaki kodlar aynı satırları değiştirmişse, her iki durumda da **Conflict (Çakışma)** çıkacaktır.
+✅ **Öneri**: Genellikle `rebase` daha temiz bir ağaç yapısı sunar. Ancak çekiniyorsanız `merge` (rebase false) en standart yoldur.
 
-1. Demo sitesi için GitHub Pages kurulumu
-2. README'ye ekran görüntüleri eklenmesi
-3. Performans testleri
+## Doğrulama
+Komutları çalıştırdıktan sonra:
+```bash
+git status
+```
+komutu ile her şeyin güncel olduğunu teyit edebilirsiniz.
