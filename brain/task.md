@@ -1,5 +1,5 @@
 # Git Divergence Resolution Task
 
-- [x] Analyze local vs remote divergence <!-- id: 0 -->
-- [/] Provide terminal commands to reconcile branches <!-- id: 1 -->
-- [ ] Verify resolution (if user applies) <!-- id: 2 -->
+- [/] Provide commands to sync deletions <!-- id: 3 -->
+- [ ] User executes commands <!-- id: 4 -->
+- [ ] Verify GitHub reflection <!-- id: 5 -->
