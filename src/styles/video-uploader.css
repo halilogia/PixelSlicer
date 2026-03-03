@@ -1,0 +1,679 @@
+/**
+ * Video Uploader Styles
+ * Modern, responsive design with mobile-first approach
+ */
+
+/* ==========================================================================
+   Video Uploader Container
+   ========================================================================== */
+
+.video-uploader {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+/* ==========================================================================
+   Drop Zone
+   ========================================================================== */
+
+.drop-zone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    padding: 2rem;
+    border: 2px dashed var(--border-color, #3a3a4a);
+    border-radius: 16px;
+    background: var(--bg-secondary, #1a1a2e);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.drop-zone:hover {
+    border-color: var(--primary-color, #7aa2f7);
+    background: var(--bg-hover, #242436);
+}
+
+.drop-zone[data-dragging="true"] {
+    border-color: var(--primary-color, #7aa2f7);
+    border-style: solid;
+    background: var(--bg-active, #2a2a4a);
+    transform: scale(1.02);
+}
+
+.drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+    z-index: 1;
+}
+
+.drop-zone-icon {
+    color: var(--text-secondary, #6b7280);
+    transition: all 0.3s ease;
+}
+
+.drop-zone:hover .drop-zone-icon {
+    color: var(--primary-color, #7aa2f7);
+}
+
+.drop-zone-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary, #e5e7eb);
+    margin: 0;
+}
+
+.drop-zone-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-secondary, #6b7280);
+    margin: 0;
+    max-width: 300px;
+}
+
+.drop-zone-requirements {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 0.5rem;
+}
+
+.requirement-badge {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary, #6b7280);
+    background: var(--bg-tertiary, #2a2a3a);
+    border-radius: 9999px;
+    border: 1px solid var(--border-color, #3a3a4a);
+}
+
+.drop-zone-active-indicator {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg,
+            rgba(122, 162, 247, 0.1) 0%,
+            rgba(122, 162, 247, 0.05) 100%);
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+/* ==========================================================================
+   Upload Progress
+   ========================================================================== */
+
+.upload-progress {
+    padding: 1.5rem;
+    background: var(--bg-secondary, #1a1a2e);
+    border-radius: 12px;
+    border: 1px solid var(--border-color, #3a3a4a);
+}
+
+.upload-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.upload-status {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary, #e5e7eb);
+}
+
+.upload-percentage {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary-color, #7aa2f7);
+}
+
+.progress-bar-container {
+    position: relative;
+    height: 8px;
+    background: var(--bg-tertiary, #2a2a3a);
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg,
+            var(--primary-color, #7aa2f7) 0%,
+            var(--primary-light, #bb9af7) 100%);
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+}
+
+.progress-bar-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.2) 50%,
+            transparent 100%);
+}
+
+.upload-progress-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    margin-bottom: 1rem;
+}
+
+.upload-speed,
+.upload-eta {
+    color: var(--primary-color, #7aa2f7);
+}
+
+.btn-cancel-upload {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary, #6b7280);
+    background: var(--bg-tertiary, #2a2a3a);
+    border: 1px solid var(--border-color, #3a3a4a);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-cancel-upload:hover {
+    color: var(--danger-color, #f7768e);
+    border-color: var(--danger-color, #f7768e);
+    background: rgba(247, 118, 142, 0.1);
+}
+
+/* ==========================================================================
+   Video List
+   ========================================================================== */
+
+.video-list {
+    margin-top: 1.5rem;
+}
+
+.video-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.video-list-header h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary, #e5e7eb);
+    margin: 0;
+}
+
+.btn-add-more {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--primary-color, #7aa2f7);
+    background: transparent;
+    border: 1px solid var(--primary-color, #7aa2f7);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-add-more:hover:not(:disabled) {
+    background: rgba(122, 162, 247, 0.1);
+}
+
+.btn-add-more:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+@media (max-width: 640px) {
+    .video-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 0.75rem;
+    }
+}
+
+.max-files-warning {
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--warning-color, #e0af68);
+    margin-top: 1rem;
+}
+
+/* ==========================================================================
+   Video Preview
+   ========================================================================== */
+
+.video-preview {
+    position: relative;
+    background: var(--bg-secondary, #1a1a2e);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color, #3a3a4a);
+    transition: all 0.3s ease;
+}
+
+.video-preview:hover {
+    border-color: var(--primary-color, #7aa2f7);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.video-preview-media {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: var(--bg-tertiary, #2a2a3a);
+    overflow: hidden;
+}
+
+.video-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-thumbnail-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary, #2a2a3a);
+    color: var(--text-secondary, #6b7280);
+}
+
+.video-play-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.video-preview:hover .video-play-overlay {
+    opacity: 1;
+}
+
+.video-duration {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: white;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 4px;
+}
+
+.btn-remove-video {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.video-preview:hover .btn-remove-video {
+    opacity: 1;
+}
+
+.btn-remove-video:hover {
+    background: var(--danger-color, #f7768e);
+}
+
+.video-preview-info {
+    padding: 0.75rem;
+}
+
+.video-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary, #e5e7eb);
+    margin: 0 0 0.25rem 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.video-meta {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+}
+
+.video-meta span:not(:last-child)::after {
+    content: '•';
+    margin-left: 0.5rem;
+    color: var(--text-muted, #4a4a5a);
+}
+
+/* ==========================================================================
+   Video Settings Panel
+   ========================================================================== */
+
+.video-settings-panel {
+    margin-bottom: 1rem;
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #3a3a4a);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.btn-settings-toggle {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--text-primary, #e5e7eb);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-settings-toggle:hover {
+    background: var(--bg-hover, #242436);
+}
+
+.video-settings-content {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color, #3a3a4a);
+}
+
+.setting-row {
+    margin-bottom: 1.25rem;
+}
+
+.setting-row:last-of-type {
+    margin-bottom: 0.75rem;
+}
+
+.setting-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-primary, #e5e7eb);
+}
+
+.setting-value {
+    font-weight: 600;
+    color: var(--primary-color, #7aa2f7);
+}
+
+.setting-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-tertiary, #2a2a3a);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.setting-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color, #7aa2f7);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.setting-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.setting-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color, #7aa2f7);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.setting-hint {
+    margin-top: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+}
+
+.btn-reset-settings {
+    width: 100%;
+    padding: 0.625rem;
+    background: var(--bg-tertiary, #2a2a3a);
+    border: 1px solid var(--border-color, #3a3a4a);
+    border-radius: 8px;
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-reset-settings:hover {
+    background: var(--bg-hover, #242436);
+    color: var(--text-primary, #e5e7eb);
+}
+
+/* ==========================================================================
+   Upload Error Toast
+   ========================================================================== */
+
+.upload-error-container {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    max-width: 400px;
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--danger-color, #f7768e);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 8px 32px rgba(247, 118, 142, 0.2);
+    z-index: 1000;
+}
+
+@media (max-width: 640px) {
+    .upload-error-container {
+        left: 1rem;
+        right: 1rem;
+        max-width: none;
+    }
+}
+
+.upload-error-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color, #3a3a4a);
+}
+
+.upload-error-header span {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--danger-color, #f7768e);
+}
+
+.btn-clear-errors {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #6b7280);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.btn-clear-errors:hover {
+    background: var(--bg-tertiary, #2a2a3a);
+    color: var(--text-primary, #e5e7eb);
+}
+
+.upload-error-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(247, 118, 142, 0.05);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.upload-error-item:last-child {
+    margin-bottom: 0;
+}
+
+.error-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.error-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.error-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary, #e5e7eb);
+    margin: 0 0 0.25rem 0;
+}
+
+.error-message {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* ==========================================================================
+   Drag Overlay
+   ========================================================================== */
+
+.drag-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.drag-overlay-content {
+    text-align: center;
+    color: white;
+}
+
+.drag-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.drag-overlay-content p {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* ==========================================================================
+   Touch & Accessibility
+   ========================================================================== */
+
+@media (pointer: coarse) {
+    .btn-remove-video {
+        opacity: 1;
+        width: 44px;
+        height: 44px;
+    }
+
+    .drop-zone {
+        min-height: 200px;
+    }
+
+    .video-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .drop-zone,
+    .video-preview,
+    .progress-bar-fill,
+    .btn-cancel-upload,
+    .btn-add-more,
+    .btn-remove-video {
+        transition: none;
+    }
+
+    .drop-zone[data-dragging="true"] {
+        transform: none;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .drop-zone {
+        border-width: 3px;
+    }
+
+    .progress-bar-fill {
+        background: var(--primary-color, #7aa2f7);
+    }
+}

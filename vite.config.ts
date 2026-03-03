@@ -11,6 +11,7 @@ export default defineConfig({
       '@infrastructure': '/src/infrastructure',
       '@presentation': '/src/presentation',
       '@ui': '/src/ui',
+      '@hooks': '/src/hooks',
     },
   },
 });

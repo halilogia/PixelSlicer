@@ -56,6 +56,31 @@ export const translations = {
 
     // Tooltip
     canvasHoverInfo: 'Seçmek/kapatmak için tıklayın. Manuel modda çizim yapın.',
+
+    // Video Upload
+    uploadVideos: 'Video Yükle',
+    dropVideosHere: 'Videoları buraya bırakın',
+    dragDropVideos: 'Videoları sürükleyip bırakın veya tıklayarak seçin',
+    uploadProgress: 'Yükleme Durumu',
+    validatingVideo: 'Video doğrulanıyor...',
+    processingVideo: 'Video işleniyor...',
+    uploading: 'Yükleniyor...',
+    uploadComplete: 'Yükleme tamamlandı!',
+    uploadFailed: 'Yükleme başarısız',
+    fileTooLarge: 'Dosya çok büyük',
+    invalidFormat: 'Geçersiz format',
+    invalidCodec: 'Desteklenmeyen codec',
+    networkError: 'Ağ hatası',
+    maxFileSize: 'Maksimum dosya boyutu: 500MB',
+    allowedFormats: 'İzin verilen formatlar: MP4, MOV (H.264)',
+    addMore: 'Daha Fazla Ekle',
+    uploadedVideos: 'Yüklenen Videolar',
+    maxFilesReached: 'Maksimum dosya sayısına ulaşıldı',
+    cancelUpload: 'İptal Et',
+    clearErrors: 'Hataları Temizle',
+    retry: 'Tekrar Dene',
+    uploadErrors: 'Yükleme Hataları',
+    remaining: 'kaldı',
   },
 
   en: {
@@ -111,6 +136,31 @@ export const translations = {
 
     // Tooltip
     canvasHoverInfo: 'Click to toggle. Draw in manual mode.',
+
+    // Video Upload
+    uploadVideos: 'Upload Videos',
+    dropVideosHere: 'Drop videos here',
+    dragDropVideos: 'Drag and drop videos here, or click to browse',
+    uploadProgress: 'Upload Progress',
+    validatingVideo: 'Validating video...',
+    processingVideo: 'Processing video...',
+    uploading: 'Uploading...',
+    uploadComplete: 'Upload complete!',
+    uploadFailed: 'Upload failed',
+    fileTooLarge: 'File too large',
+    invalidFormat: 'Invalid format',
+    invalidCodec: 'Unsupported codec',
+    networkError: 'Network error',
+    maxFileSize: 'Maximum file size: 500MB',
+    allowedFormats: 'Allowed formats: MP4, MOV (H.264)',
+    addMore: 'Add More',
+    uploadedVideos: 'Uploaded Videos',
+    maxFilesReached: 'Maximum files reached',
+    cancelUpload: 'Cancel',
+    clearErrors: 'Clear Errors',
+    retry: 'Retry',
+    uploadErrors: 'Upload Errors',
+    remaining: 'remaining',
   },
 } as const;
 

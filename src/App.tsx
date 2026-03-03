@@ -5,7 +5,13 @@ import { decodeGif } from './infrastructure/GifService';
 import type { GridConfig } from './domain/FrameLogic';
 import { useI18n } from './i18n/useI18n';
 import GallerySection from './components/GallerySection';
+import { VideoUploader } from './presentation/components/VideoUploader';
+import type { VideoFile } from './domain/video/Video';
+import { videoFrameExtractor, ExtractedFrame } from './infrastructure/video/VideoFrameExtractor';
+import { VideoFrameGridService, VideoFrameGrid } from './infrastructure/video/VideoFrameGridService';
+import { VideoProcessingConfig, DEFAULT_VIDEO_CONFIG } from './domain/video/Video';
 import './styles/main.css';
+import './styles/video-uploader.css';
 
 // Initialize ViewModel
 const viewModel = new EditorViewModel();
@@ -13,11 +19,134 @@ const viewModel = new EditorViewModel();
 function App() {
   const [state, setState] = useState(viewModel.getState());
   const [showSettings, setShowSettings] = useState(false);
+  const [showVideoUploader, setShowVideoUploader] = useState(false);
+  const [videoFrames, setVideoFrames] = useState<ExtractedFrame[]>([]);
+  const [isExtractingFrames, setIsExtractingFrames] = useState(false);
+  const [extractionProgress, setExtractionProgress] = useState(0);
+  const [videoFrameGrid, setVideoFrameGrid] = useState<VideoFrameGrid | null>(null);
   const { language, changeLanguage, t } = useI18n();
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-  
+  const videoAnimationRef = useRef<number | null>(null);
+
+  // Calculate optimal zoom to fit content in viewport
+  const calculateOptimalZoom = useCallback((contentWidth: number, contentHeight: number): number => {
+    if (!canvasContainerRef.current) return 1;
+    
+    const container = canvasContainerRef.current;
+    const containerWidth = container.clientWidth - 40; // Padding
+    const containerHeight = container.clientHeight - 40;
+    
+    // Calculate zoom to fit entire content
+    const zoomX = containerWidth / contentWidth;
+    const zoomY = containerHeight / contentHeight;
+    
+    // Use smaller zoom to ensure entire content fits
+    const optimalZoom = Math.min(zoomX, zoomY, 1); // Max 100%
+    
+    return Math.max(0.1, optimalZoom); // Min 10%
+  }, []);
+
+  // Cleanup function for video frames and canvas
+  const cleanupVideoContent = useCallback(() => {
+    // Stop any playing animation
+    if (videoAnimationRef.current) {
+      cancelAnimationFrame(videoAnimationRef.current);
+      videoAnimationRef.current = null;
+    }
+    
+    // Clear video frames from memory
+    if (videoFrames.length > 0) {
+      VideoFrameGridService.cleanupFrames(videoFrames);
+      setVideoFrames([]);
+    }
+    
+    // Clear video grid
+    setVideoFrameGrid(null);
+    
+    // Reset state
+    setIsExtractingFrames(false);
+    setExtractionProgress(0);
+    
+    // Clear main canvas
+    if (mainCanvasRef.current) {
+      const ctx = mainCanvasRef.current.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, mainCanvasRef.current.width, mainCanvasRef.current.height);
+      }
+      mainCanvasRef.current.width = 0;
+      mainCanvasRef.current.height = 0;
+    }
+  }, [videoFrames]);
+
+  // Handle video upload completion and extract frames
+  const handleVideoUploadComplete = useCallback(async (videos: VideoFile[], processingConfig: VideoProcessingConfig = DEFAULT_VIDEO_CONFIG) => {
+    if (videos.length === 0) return;
+    
+    // Close uploader modal
+    setShowVideoUploader(false);
+    
+    // Clean up any previous video/image content
+    cleanupVideoContent();
+    viewModel.clearImage();
+    
+    // Process the first uploaded video
+    const videoFile = videos[0];
+    setIsExtractingFrames(true);
+    setExtractionProgress(0);
+    
+    try {
+      // Extract frames from video
+      const frames = await videoFrameExtractor.extractFrames(
+        videoFile,
+        {
+          fps: processingConfig.fps,
+          maxFrames: processingConfig.maxFrames,
+          targetWidth: processingConfig.targetWidth,
+        },
+        (progress) => {
+          setExtractionProgress(progress.percentage);
+        }
+      );
+      
+      setVideoFrames(frames);
+      
+      // Create sprite sheet from frames
+      const grid = await VideoFrameGridService.createSpriteSheetFromFrames(frames);
+      setVideoFrameGrid(grid);
+      
+      // Convert sprite sheet to image for EditorViewModel
+      const spriteImage = await VideoFrameGridService.canvasToImage(grid.spriteSheet);
+      
+      // Set image in EditorViewModel
+      viewModel.setImage(spriteImage);
+      
+      // Auto-calculate optimal grid based on frame count
+      const optimalCols = grid.config.columns;
+      const optimalRows = grid.config.rows;
+      viewModel.setGridConfig({
+        cols: optimalCols,
+        rows: optimalRows,
+        offsetX: 0,
+        offsetY: 0,
+        padding: 0,
+      });
+      
+      // Calculate and apply optimal zoom
+      const spriteWidth = grid.spriteSheet.width;
+      const spriteHeight = grid.spriteSheet.height;
+      const optimalZoom = calculateOptimalZoom(spriteWidth, spriteHeight);
+      viewModel.setZoom(optimalZoom);
+      
+      // Video processed and displayed in grid
+    } catch (error) {
+      console.error('Video processing failed:', error);
+    } finally {
+      setIsExtractingFrames(false);
+    }
+  }, [cleanupVideoContent]);
+
   // Subscribe to state changes
   useEffect(() => {
     const unsubscribe = viewModel.subscribe(() => {
@@ -505,6 +634,13 @@ function App() {
           >
             <i className="fa-solid fa-gear"></i>
           </button>
+          <button
+            className={`btn ${showVideoUploader ? 'btn--active' : 'btn--secondary'}`}
+            onClick={() => setShowVideoUploader(!showVideoUploader)}
+            title={t('uploadVideos')}
+          >
+            <i className="fa-solid fa-video"></i>
+          </button>
         </div>
       </header>
 
@@ -746,6 +882,21 @@ function App() {
             </button>
           </div>
 
+          {/* Frame Extraction Progress */}
+          {isExtractingFrames && (
+            <div className="frame-extraction-progress">
+              <div className="progress-bar-container" style={{ margin: '10px 20px' }}>
+                <div
+                  className="progress-bar-fill"
+                  style={{ width: `${extractionProgress}%` }}
+                />
+              </div>
+              <p style={{ textAlign: 'center', fontSize: '12px', color: '#7aa2f7' }}>
+                Frame çıkarılıyor... {extractionProgress}%
+              </p>
+            </div>
+          )}
+
           {/* Canvas Wrapper */}
           <div 
             ref={canvasContainerRef}
@@ -761,7 +912,7 @@ function App() {
               }
             }}
           >
-            {!state.isImageLoaded && (
+            {!state.isImageLoaded && videoFrames.length === 0 && (
               <div className="welcome">
                 <i className="fa-solid fa-cloud-arrow-up welcome__icon"></i>
                 <h2 className="welcome__title">Resim Yükleyin</h2>
@@ -830,6 +981,28 @@ function App() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Uploader Modal */}
+      {showVideoUploader && (
+        <div className="modal-overlay" onClick={() => setShowVideoUploader(false)}>
+          <div className="modal modal--large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal__header">
+              <h3 className="modal__title">
+                <i className="fa-solid fa-video"></i> {t('uploadVideos')}
+              </h3>
+              <button className="modal__close" onClick={() => setShowVideoUploader(false)}>
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div className="modal__body" style={{ padding: 0 }}>
+              <VideoUploader
+                onUploadComplete={handleVideoUploadComplete}
+                maxFiles={10}
+              />
             </div>
           </div>
         </div>
