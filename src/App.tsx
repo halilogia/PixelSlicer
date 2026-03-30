@@ -8,7 +8,7 @@ import GallerySection from './components/GallerySection';
 import { VideoUploader } from './presentation/components/VideoUploader';
 import type { VideoFile } from './domain/video/Video';
 import { videoFrameExtractor, ExtractedFrame } from './infrastructure/video/VideoFrameExtractor';
-import { VideoFrameGridService, VideoFrameGrid } from './infrastructure/video/VideoFrameGridService';
+import { VideoFrameGridService } from './infrastructure/video/VideoFrameGridService';
 import { VideoProcessingConfig, DEFAULT_VIDEO_CONFIG } from './domain/video/Video';
 import './styles/main.css';
 import './styles/video-uploader.css';
@@ -23,7 +23,7 @@ function App() {
   const [videoFrames, setVideoFrames] = useState<ExtractedFrame[]>([]);
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
   const [extractionProgress, setExtractionProgress] = useState(0);
-  const [videoFrameGrid, setVideoFrameGrid] = useState<VideoFrameGrid | null>(null);
+
   const { language, changeLanguage, t } = useI18n();
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,9 +61,6 @@ function App() {
       VideoFrameGridService.cleanupFrames(videoFrames);
       setVideoFrames([]);
     }
-    
-    // Clear video grid
-    setVideoFrameGrid(null);
     
     // Reset state
     setIsExtractingFrames(false);
@@ -114,7 +111,6 @@ function App() {
       
       // Create sprite sheet from frames
       const grid = await VideoFrameGridService.createSpriteSheetFromFrames(frames);
-      setVideoFrameGrid(grid);
       
       // Convert sprite sheet to image for EditorViewModel
       const spriteImage = await VideoFrameGridService.canvasToImage(grid.spriteSheet);
@@ -612,7 +608,7 @@ function App() {
       {/* Header */}
       <header className="header">
         <div className="header__brand">
-          <i className="fa-solid fa-layer-group header__logo"></i>
+          <img src="/assets/logo2.png" alt="PixelSlicer" className="header__logo" />
           <div>
             <h1 className="header__title">Pixel<span>Slicer</span></h1>
             <p className="header__subtitle">{t('appSubtitle')}</p>

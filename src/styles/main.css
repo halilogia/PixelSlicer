@@ -144,8 +144,10 @@ body {
 }
 
 .header__logo {
-  font-size: 24px;
-  color: var(--accent-blue);
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
 }
 
 .header__title {
