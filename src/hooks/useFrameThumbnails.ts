@@ -18,7 +18,7 @@ const DEFAULT_OPTIONS: Required<ThumbnailOptions> = {
 };
 
 export function useFrameThumbnails(
-  image: HTMLImageElement | null,
+  image: HTMLImageElement | HTMLCanvasElement | null,
   frames: readonly Frame[],
   options: ThumbnailOptions = {}
 ): Map<number, string> {
@@ -28,7 +28,7 @@ export function useFrameThumbnails(
   // Refs for version tracking
   const frameVersionsRef = useRef<Map<number, number>>(new Map());
   const pendingUpdateRef = useRef<number | null>(null);
-  const lastImageRef = useRef<HTMLImageElement | null>(null);
+  const lastImageRef = useRef<HTMLImageElement | HTMLCanvasElement | null>(null);
 
   // Generate thumbnail for single frame - creates fresh canvas to avoid resize issues
   const generateThumbnail = useCallback((

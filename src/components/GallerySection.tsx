@@ -9,7 +9,7 @@ import { EditorViewModel } from '../presentation/EditorViewModel';
 import { exportSingleFrame, downloadBlob } from '../infrastructure/ExportService';
 
 interface GallerySectionProps {
-  image: HTMLImageElement | null;
+  image: HTMLImageElement | HTMLCanvasElement | null;
   frames: Frame[];
   isImageLoaded: boolean;
   selectedFrameIndex: number | null;

@@ -16,6 +16,7 @@ export type StateListener = () => void;
 export interface EditorState {
   // Image
   image: HTMLImageElement | null;
+  processedImage: HTMLCanvasElement | HTMLImageElement | null;
   imageDimensions: ImageDimensions | null;
   isImageLoaded: boolean;
   
@@ -47,10 +48,15 @@ export interface EditorState {
   
   // Export
   sheetColumns: number;
+  
+  // Effects
+  removeBackground: boolean;
+  removeBgColor: { r: number, g: number, b: number, tolerance: number };
 }
 
 const DEFAULT_STATE: EditorState = {
   image: null,
+  processedImage: null,
   imageDimensions: null,
   isImageLoaded: false,
   gridConfig: {
@@ -76,6 +82,8 @@ const DEFAULT_STATE: EditorState = {
   zoom: 1,
   previewZoom: -1, // -1 means auto-fit
   sheetColumns: 8,
+  removeBackground: false,
+  removeBgColor: { r: 0, g: 0, b: 0, tolerance: 30 },
 };
 
 export class EditorViewModel {
@@ -135,12 +143,14 @@ export class EditorViewModel {
       height: image.naturalHeight,
     };
     this.state.isImageLoaded = true;
+    this.updateProcessedImage();
     this.recalculateFrames();
     this.notify();
   }
 
   clearImage(): void {
     this.state.image = null;
+    this.state.processedImage = null;
     this.state.imageDimensions = null;
     this.state.isImageLoaded = false;
     this.state.frames = [];
@@ -339,7 +349,7 @@ export class EditorViewModel {
     this.state.sheetColumns = Math.max(1, columns);
     this.notify();
   }
-
+  
   // Reset fine-tune settings
   resetFineTune(): void {
     this.state.gridConfig.offsetX = 0;
@@ -348,7 +358,63 @@ export class EditorViewModel {
     this.recalculateFrames();
     this.notify();
   }
+  
+  // Effects settings
+  toggleRemoveBackground(): void {
+    this.state.removeBackground = !this.state.removeBackground;
+    this.updateProcessedImage();
+    this.notify();
+  }
+  
+  setRemoveBgColor(r: number, g: number, b: number, tolerance: number): void {
+    this.state.removeBgColor = { r, g, b, tolerance };
+    if (this.state.removeBackground) {
+      this.updateProcessedImage();
+    }
+    this.notify();
+  }
 
+  private updateProcessedImage(): void {
+    if (!this.state.image || !this.state.imageDimensions) return;
+
+    if (!this.state.removeBackground) {
+      this.state.processedImage = this.state.image;
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = this.state.imageDimensions.width;
+    canvas.height = this.state.imageDimensions.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    
+    if (!ctx) {
+      this.state.processedImage = this.state.image;
+      return;
+    }
+
+    ctx.drawImage(this.state.image, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const { r: targetR, g: targetG, b: targetB, tolerance } = this.state.removeBgColor;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      const diffR = Math.abs(r - targetR);
+      const diffG = Math.abs(g - targetG);
+      const diffB = Math.abs(b - targetB);
+
+      if (diffR <= tolerance && diffG <= tolerance && diffB <= tolerance) {
+        data[i + 3] = 0; // Set alpha to 0 (transparent)
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    this.state.processedImage = canvas;
+  }
+  
   // Drawing state management
   isDrawing(): boolean {
     return this._isDrawing;

@@ -88,12 +88,14 @@ export interface VideoProcessingConfig {
   fps: number;
   maxFrames: number;
   targetWidth: number;
+  useOriginalResolution?: boolean;
 }
 
 export const DEFAULT_VIDEO_CONFIG: VideoProcessingConfig = {
   fps: 10,
   maxFrames: 60,
   targetWidth: 800,
+  useOriginalResolution: false,
 };
 
 export const VIDEO_CONFIG_LIMITS = {

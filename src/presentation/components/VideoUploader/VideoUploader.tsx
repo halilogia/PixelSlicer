@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useVideoUpload } from '@hooks/useVideoUpload';
 import { useDragAndDrop } from '@hooks/useDragAndDrop';
 import { useVideoConfigStorage } from '@hooks/useVideoConfigStorage';
+import { useI18n } from '@/i18n/useI18n';
 import { DropZone } from './DropZone';
 import { UploadProgress } from './UploadProgress';
 import { VideoPreview } from './VideoPreview';
@@ -22,6 +23,7 @@ interface VideoUploaderProps {
 export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const { t } = useI18n();
   
   // Use localStorage hook for persistent config
   const { config, saveConfig, resetConfig } = useVideoConfigStorage();
@@ -83,10 +85,13 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
     await retryUpload(file);
   };
 
-  const handleConfigChange = (key: keyof VideoProcessingConfig, value: number) => {
-    const limits = VIDEO_CONFIG_LIMITS[key];
-    const clampedValue = Math.max(limits.min, Math.min(limits.max, value));
-    const newConfig = { ...localConfig, [key]: clampedValue };
+  const handleConfigChange = (key: keyof VideoProcessingConfig, value: number | boolean) => {
+    let finalValue = value;
+    if (typeof value === 'number' && key in VIDEO_CONFIG_LIMITS) {
+      const limits = VIDEO_CONFIG_LIMITS[key as keyof typeof VIDEO_CONFIG_LIMITS];
+      finalValue = Math.max(limits.min, Math.min(limits.max, value));
+    }
+    const newConfig = { ...localConfig, [key]: finalValue };
     setLocalConfig(newConfig);
     saveConfig(newConfig);
   };
@@ -94,6 +99,12 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
   const handleResetConfig = () => {
     resetConfig();
     setLocalConfig(config);
+  };
+
+  const applyPreset = (preset: Partial<VideoProcessingConfig>) => {
+    const newConfig = { ...localConfig, ...preset };
+    setLocalConfig(newConfig);
+    saveConfig(newConfig);
   };
 
   return (
@@ -115,7 +126,7 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
             <circle cx="12" cy="12" r="3" />
             <path d="M12 1v6m0 6v10m4.22-14.22l4.24 4.24M6.34 6.34L2.1 2.1m17.8 17.8l-4.24-4.24M6.34 17.66l-4.24 4.24" />
           </svg>
-          İşlem Ayarları
+          {t('processingSettings')}
           <svg
             width="12"
             height="12"
@@ -138,10 +149,42 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
+              {/* Presets */}
+              <div className="video-presets">
+                <button 
+                  className="btn-preset" 
+                  onClick={() => applyPreset({ fps: 8, maxFrames: 40, useOriginalResolution: true })}
+                  title={t('presetPixelArtDesc')}
+                >
+                  <i className="fa-solid fa-gamepad"></i> {t('presetPixelArt')}
+                </button>
+                <button 
+                  className="btn-preset" 
+                  onClick={() => applyPreset({ fps: 24, maxFrames: 120, targetWidth: 500, useOriginalResolution: false })}
+                  title={t('presetSmoothDesc')}
+                >
+                  <i className="fa-solid fa-person-running"></i> {t('presetSmooth')}
+                </button>
+                <button 
+                  className="btn-preset" 
+                  onClick={() => applyPreset({ fps: 12, maxFrames: 150, targetWidth: 250, useOriginalResolution: false })}
+                  title={t('presetLongEffectDesc')}
+                >
+                  <i className="fa-solid fa-burst"></i> {t('presetLongEffect')}
+                </button>
+                <button 
+                  className="btn-preset" 
+                  onClick={() => applyPreset({ fps: 10, maxFrames: 60, targetWidth: 800, useOriginalResolution: false })}
+                  title={t('presetStandardDesc')}
+                >
+                  <i className="fa-solid fa-sliders"></i> {t('presetStandard')}
+                </button>
+              </div>
+
               {/* FPS Setting */}
               <div className="setting-row">
                 <label className="setting-label">
-                  <span>FPS (Kare Hızı)</span>
+                  <span>{t('fpsSetting')}</span>
                   <span className="setting-value">{localConfig.fps}</span>
                 </label>
                 <input
@@ -153,14 +196,14 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
                   className="setting-slider"
                 />
                 <div className="setting-hint">
-                  {localConfig.fps} FPS × 6 saniye = {localConfig.fps * 6} kare
+                  {t('fpsHint').replace('{fps}', localConfig.fps.toString()).replace('{total}', (localConfig.fps * 6).toString())}
                 </div>
               </div>
 
               {/* Max Frames Setting */}
               <div className="setting-row">
                 <label className="setting-label">
-                  <span>Maksimum Kare</span>
+                  <span>{t('maxFramesSetting')}</span>
                   <span className="setting-value">{localConfig.maxFrames}</span>
                 </label>
                 <input
@@ -172,16 +215,30 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
                   className="setting-slider"
                 />
                 <div className="setting-hint">
-                  Daha fazla kare = Daha akıcı animasyon
+                  {t('maxFramesHint')}
                 </div>
               </div>
 
               {/* Target Width Setting */}
               <div className="setting-row">
-                <label className="setting-label">
-                  <span>Kare Genişliği</span>
-                  <span className="setting-value">{localConfig.targetWidth}px</span>
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label className="setting-label" style={{ marginBottom: 0 }}>
+                    <span>{t('targetWidthSetting')}</span>
+                    <span className="setting-value">
+                      {localConfig.useOriginalResolution ? t('original') : `${localConfig.targetWidth}px`}
+                    </span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={localConfig.useOriginalResolution || false}
+                      onChange={(e) => handleConfigChange('useOriginalResolution', e.target.checked)}
+                      style={{ marginRight: '6px' }}
+                    />
+                    {t('keepOriginalRes')}
+                  </label>
+                </div>
+                
                 <input
                   type="range"
                   min={VIDEO_CONFIG_LIMITS.targetWidth.min}
@@ -190,9 +247,13 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
                   value={localConfig.targetWidth}
                   onChange={(e) => handleConfigChange('targetWidth', parseInt(e.target.value))}
                   className="setting-slider"
+                  disabled={localConfig.useOriginalResolution}
+                  style={{ opacity: localConfig.useOriginalResolution ? 0.5 : 1 }}
                 />
-                <div className="setting-hint">
-                  {Math.floor(4096 / localConfig.targetWidth)} sütun × {Math.ceil(localConfig.maxFrames / Math.floor(4096 / localConfig.targetWidth))} satır grid
+                <div className="setting-hint" style={{ marginTop: '6px', color: localConfig.useOriginalResolution ? '#ff9e64' : 'var(--text-muted)' }}>
+                  {localConfig.useOriginalResolution 
+                    ? t('resWarning') 
+                    : t('gridHint').replace('{cols}', Math.floor(4096 / localConfig.targetWidth).toString()).replace('{rows}', Math.ceil(localConfig.maxFrames / Math.floor(4096 / localConfig.targetWidth)).toString())}
                 </div>
               </div>
 
@@ -202,7 +263,7 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
                 onClick={handleResetConfig}
                 type="button"
               >
-                Varsayılana Sıfırla
+                {t('resetToDefault')}
               </button>
             </motion.div>
           )}
@@ -238,13 +299,13 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
             className="video-list"
           >
             <div className="video-list-header">
-              <h3>Yüklenen Videolar ({videos.length})</h3>
+              <h3>{t('uploadedVideos')} ({videos.length})</h3>
               <button
                 className="btn-add-more"
                 onClick={openFileDialog}
                 disabled={videos.length >= maxFiles}
               >
-                + Daha Fazla Ekle
+                + {t('addMore')}
               </button>
             </div>
 
@@ -261,7 +322,7 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
 
             {videos.length >= maxFiles && (
               <p className="max-files-warning">
-                Maksimum {maxFiles} dosya limitine ulaşıldı
+                {t('maxFilesReached')}
               </p>
             )}
           </motion.div>
@@ -290,7 +351,7 @@ export function VideoUploader({ onUploadComplete, maxFiles = 10 }: VideoUploader
           >
             <div className="drag-overlay-content">
               <div className="drag-icon">📁</div>
-              <p>Videoları buraya bırakın</p>
+              <p>{t('dropVideosHere')}</p>
             </div>
           </motion.div>
         )}

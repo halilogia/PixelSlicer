@@ -5,6 +5,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadError } from '@domain/video/Video';
+import { useI18n } from '@/i18n/useI18n';
 
 interface UploadErrorToastProps {
   errors: UploadError[];
@@ -13,6 +14,8 @@ interface UploadErrorToastProps {
 }
 
 export function UploadErrorToast({ errors, onClear }: UploadErrorToastProps) {
+  const { t } = useI18n();
+
   if (errors.length === 0) return null;
 
   const getErrorIcon = (code: string) => {
@@ -32,15 +35,15 @@ export function UploadErrorToast({ errors, onClear }: UploadErrorToastProps) {
   const getErrorTitle = (code: string): string => {
     switch (code) {
       case 'FILE_TOO_LARGE':
-        return 'File Too Large';
+        return t('fileTooLarge');
       case 'INVALID_FORMAT':
-        return 'Invalid Format';
+        return t('invalidFormat');
       case 'INVALID_CODEC':
-        return 'Unsupported Codec';
+        return t('invalidCodec');
       case 'NETWORK_ERROR':
-        return 'Network Error';
+        return t('networkError');
       case 'UPLOAD_FAILED':
-        return 'Upload Failed';
+        return t('uploadFailed');
       default:
         return 'Error';
     }
@@ -54,12 +57,12 @@ export function UploadErrorToast({ errors, onClear }: UploadErrorToastProps) {
       exit={{ opacity: 0, x: 100 }}
     >
       <div className="upload-error-header">
-        <span>Upload Errors ({errors.length})</span>
+        <span>{t('uploadErrors')} ({errors.length})</span>
         <button
           className="btn-clear-errors"
           onClick={onClear}
           type="button"
-          aria-label="Clear errors"
+          aria-label={t('clearErrors')}
         >
           <svg
             width="16"

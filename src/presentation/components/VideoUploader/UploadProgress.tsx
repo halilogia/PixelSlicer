@@ -5,6 +5,7 @@
 
 import { motion } from 'framer-motion';
 import { UploadProgress as UploadProgressType, formatFileSize } from '@domain/video/Video';
+import { useI18n } from '@/i18n/useI18n';
 
 interface UploadProgressProps {
   progress: UploadProgressType;
@@ -12,22 +13,23 @@ interface UploadProgressProps {
 }
 
 export function UploadProgress({ progress, onCancel }: UploadProgressProps) {
+  const { t } = useI18n();
   const { percentage, loaded, total, speed, estimatedTime, status } = progress;
 
   const getStatusText = () => {
     switch (status) {
       case 'validating':
-        return 'Validating video...';
+        return t('validatingVideo');
       case 'processing':
-        return 'Processing video...';
+        return t('processingVideo');
       case 'uploading':
-        return 'Uploading...';
+        return t('uploading');
       case 'completed':
-        return 'Upload complete!';
+        return t('uploadComplete');
       case 'error':
-        return 'Upload failed';
+        return t('uploadFailed');
       default:
-        return 'Preparing...';
+        return t('uploading'); // or another fallback
     }
   };
 
@@ -38,9 +40,9 @@ export function UploadProgress({ progress, onCancel }: UploadProgressProps) {
 
   const formatTime = (seconds: number | undefined): string => {
     if (!seconds || seconds < 0) return '';
-    if (seconds < 60) return `${Math.ceil(seconds)}s remaining`;
+    if (seconds < 60) return `${Math.ceil(seconds)}s ${t('remaining')}`;
     const mins = Math.ceil(seconds / 60);
-    return `${mins}m remaining`;
+    return `${mins}m ${t('remaining')}`;
   };
 
   return (
@@ -92,7 +94,7 @@ export function UploadProgress({ progress, onCancel }: UploadProgressProps) {
           onClick={onCancel}
           type="button"
         >
-          Cancel
+          {t('cancelUpload')}
         </button>
       )}
     </motion.div>

@@ -8,7 +8,7 @@ interface FrameThumbnailProps {
   frame: Frame;
   index: number;
   thumbnailUrl: string | undefined;
-  image: HTMLImageElement | null;
+  image: HTMLImageElement | HTMLCanvasElement | null;
   isSelected: boolean;
   onToggle: (index: number) => void;
   onPreview: (index: number) => void;

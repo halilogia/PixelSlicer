@@ -5,6 +5,7 @@
 
 import { motion } from 'framer-motion';
 import { formatFileSize, MAX_FILE_SIZE } from '@domain/video/Video';
+import { useI18n } from '@/i18n/useI18n';
 
 interface DropZoneProps {
   isDragging: boolean;
@@ -18,6 +19,8 @@ interface DropZoneProps {
 }
 
 export function DropZone({ isDragging, onClick, handlers }: DropZoneProps) {
+  const { t } = useI18n();
+
   return (
     <motion.div
       className="drop-zone"
@@ -77,11 +80,11 @@ export function DropZone({ isDragging, onClick, handlers }: DropZoneProps) {
         </motion.div>
 
         <h3 className="drop-zone-title">
-          {isDragging ? 'Drop videos here' : 'Upload Videos'}
+          {isDragging ? t('dropVideosHere') : t('uploadVideos')}
         </h3>
 
         <p className="drop-zone-subtitle">
-          Drag and drop your videos here, or click to browse
+          {t('dragDropVideos')}
         </p>
 
         <div className="drop-zone-requirements">

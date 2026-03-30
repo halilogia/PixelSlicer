@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { EditorViewModel } from './presentation/EditorViewModel';
-import { exportAsZip, exportAsSpriteSheet, downloadBlob } from './infrastructure/ExportService';
+import { exportAsZip, exportAsSpriteSheet, exportAsGif, downloadBlob } from './infrastructure/ExportService';
 import { decodeGif } from './infrastructure/GifService';
 import type { GridConfig } from './domain/FrameLogic';
 import { useI18n } from './i18n/useI18n';
@@ -10,6 +10,7 @@ import type { VideoFile } from './domain/video/Video';
 import { videoFrameExtractor, ExtractedFrame } from './infrastructure/video/VideoFrameExtractor';
 import { VideoFrameGridService } from './infrastructure/video/VideoFrameGridService';
 import { VideoProcessingConfig, DEFAULT_VIDEO_CONFIG } from './domain/video/Video';
+import logoImg from './assets/logo2.png';
 import './styles/main.css';
 import './styles/video-uploader.css';
 
@@ -100,7 +101,7 @@ function App() {
         {
           fps: processingConfig.fps,
           maxFrames: processingConfig.maxFrames,
-          targetWidth: processingConfig.targetWidth,
+          targetWidth: processingConfig.useOriginalResolution ? undefined : processingConfig.targetWidth,
         },
         (progress) => {
           setExtractionProgress(progress.percentage);
@@ -190,7 +191,11 @@ function App() {
     ctx.scale(state.zoom, state.zoom);
     
     // Draw image
-    ctx.drawImage(state.image, 0, 0);
+    if (state.processedImage) {
+      ctx.drawImage(state.processedImage, 0, 0);
+    } else {
+      ctx.drawImage(state.image, 0, 0);
+    }
     
     // Get drawing state for real-time feedback from state
     const drawingState = state.isDrawing ? {
@@ -364,8 +369,10 @@ function App() {
     }
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const imageToDraw = state.processedImage || state.image;
+    
     ctx.drawImage(
-      state.image,
+      imageToDraw,
       currentFrame.x, currentFrame.y, currentFrame.w, currentFrame.h,
       0, 0, currentFrame.w, currentFrame.h
     );
@@ -439,15 +446,24 @@ function App() {
   // Handle export
   const handleExportZip = useCallback(async () => {
     if (!state.image) return;
-    const blob = await exportAsZip(state.image, viewModel.getFrames());
+    const targetImage = state.processedImage || state.image;
+    const blob = await exportAsZip(targetImage, viewModel.getFrames());
     downloadBlob(blob, 'frames.zip');
-  }, [state.image]);
+  }, [state.image, state.processedImage]);
 
   const handleExportSpriteSheet = useCallback(async () => {
     if (!state.image) return;
-    const blob = await exportAsSpriteSheet(state.image, viewModel.getFrames(), state.sheetColumns);
+    const targetImage = state.processedImage || state.image;
+    const blob = await exportAsSpriteSheet(targetImage, viewModel.getFrames(), state.sheetColumns);
     downloadBlob(blob, 'spritesheet.png');
-  }, [state.image, state.sheetColumns]);
+  }, [state.image, state.processedImage, state.sheetColumns]);
+
+  const handleExportGif = useCallback(async () => {
+    if (!state.image) return;
+    const targetImage = state.processedImage || state.image;
+    const blob = await exportAsGif(targetImage, viewModel.getFrames(), state.fps);
+    downloadBlob(blob, 'animation.gif');
+  }, [state.image, state.processedImage, state.fps]);
 
   // Canvas click handler for frame toggle (when manual mode is OFF)
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -608,7 +624,7 @@ function App() {
       {/* Header */}
       <header className="header">
         <div className="header__brand">
-          <img src="/assets/logo2.png" alt="PixelSlicer" className="header__logo" />
+          <img src={logoImg} alt="PixelSlicer" className="header__logo" />
           <div>
             <h1 className="header__title">Pixel<span>Slicer</span></h1>
             <p className="header__subtitle">{t('appSubtitle')}</p>
@@ -775,7 +791,7 @@ function App() {
               <canvas ref={previewCanvasRef}></canvas>
               {viewModel.getActiveFrames().length === 0 && (
                 <div className="preview-empty">
-                  Pasif
+                  {t('inactive')}
                 </div>
               )}
             </div>
@@ -826,6 +842,68 @@ function App() {
           </div>
 
           {/* Export */}
+          {/* Effects / Remove Background */}
+          <div className="sidebar__section">
+            <h3 className="sidebar__title">
+              <i className="fa-solid fa-wand-magic-sparkles" style={{ color: '#ff9e64' }}></i> {t('effects')}
+            </h3>
+            
+            <div className="form-group" style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '12px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={state.removeBackground}
+                  onChange={() => viewModel.toggleRemoveBackground()}
+                  style={{ marginRight: '8px' }}
+                />
+                {t('removeBackgroundColor')}
+              </label>
+            </div>
+
+            {state.removeBackground && (
+              <div className="effects-controls" style={{ padding: '8px', backgroundColor: 'var(--bg-lighter)', borderRadius: '4px' }}>
+                <div className="form-group" style={{ marginBottom: '8px' }}>
+                  <label className="form-label">{t('colorRgb')}</label>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <input 
+                      type="number" className="form-input" placeholder="R" min="0" max="255"
+                      value={state.removeBgColor.r}
+                      onChange={(e) => viewModel.setRemoveBgColor(parseInt(e.target.value)||0, state.removeBgColor.g, state.removeBgColor.b, state.removeBgColor.tolerance)}
+                      style={{ padding: '4px' }}
+                    />
+                    <input 
+                      type="number" className="form-input" placeholder="G" min="0" max="255"
+                      value={state.removeBgColor.g}
+                      onChange={(e) => viewModel.setRemoveBgColor(state.removeBgColor.r, parseInt(e.target.value)||0, state.removeBgColor.b, state.removeBgColor.tolerance)}
+                      style={{ padding: '4px' }}
+                    />
+                    <input 
+                      type="number" className="form-input" placeholder="B" min="0" max="255"
+                      value={state.removeBgColor.b}
+                      onChange={(e) => viewModel.setRemoveBgColor(state.removeBgColor.r, state.removeBgColor.g, parseInt(e.target.value)||0, state.removeBgColor.tolerance)}
+                      style={{ padding: '4px' }}
+                    />
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: '0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <label className="form-label" style={{ marginBottom: 0 }}>{t('tolerance')}</label>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{state.removeBgColor.tolerance}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={255}
+                    value={state.removeBgColor.tolerance}
+                    onChange={(e) => viewModel.setRemoveBgColor(state.removeBgColor.r, state.removeBgColor.g, state.removeBgColor.b, parseInt(e.target.value))}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Export Options */}
           <div className="sidebar__section">
             <div className="form-group">
               <label className="form-label">{t('sheetColumns')}</label>
@@ -851,6 +929,13 @@ function App() {
               <i className="fa-solid fa-image"></i> {t('downloadSpriteSheet')}
             </button>
             <button
+              className="btn btn--success"
+              style={{ width: '100%', marginBottom: '8px', backgroundColor: '#9ece6a', color: '#1a1b26' }}
+              onClick={handleExportGif}
+            >
+              <i className="fa-solid fa-film"></i> {t('downloadGif')}
+            </button>
+            <button
               className="btn btn--secondary"
               style={{ width: '100%', backgroundColor: '#bb9af7', color: '#1a1b26' }}
               onClick={handleExportZip}
@@ -864,17 +949,17 @@ function App() {
         <main className="canvas-area">
           {/* Zoom Controls */}
           <div className="zoom-controls">
-            <button className="zoom-btn" onClick={() => viewModel.zoomOut()} title="Küçült">
+            <button className="zoom-btn" onClick={() => viewModel.zoomOut()} title={t('zoomOut')}>
               <i className="fa-solid fa-minus"></i>
             </button>
             <span className="zoom-level">{Math.round(state.zoom * 100)}%</span>
-            <button className="zoom-btn" onClick={() => viewModel.zoomIn()} title="Büyüt">
+            <button className="zoom-btn" onClick={() => viewModel.zoomIn()} title={t('zoomIn')}>
               <i className="fa-solid fa-plus"></i>
             </button>
             <div className="zoom-divider"></div>
-            <button className="zoom-btn zoom-btn--text" onClick={() => viewModel.setZoom(1)} title="Ekrana Sığdır">
+            <button className="zoom-btn zoom-btn--text" onClick={() => viewModel.setZoom(1)} title={t('fitScreen')}>
               <i className="fa-solid fa-compress"></i>
-              <span>Sığdır</span>
+              <span>{t('fit')}</span>
             </button>
           </div>
 
@@ -888,7 +973,7 @@ function App() {
                 />
               </div>
               <p style={{ textAlign: 'center', fontSize: '12px', color: '#7aa2f7' }}>
-                Frame çıkarılıyor... {extractionProgress}%
+                {t('extractingFrames').replace('{progress}', extractionProgress.toString())}
               </p>
             </div>
           )}
@@ -911,8 +996,8 @@ function App() {
             {!state.isImageLoaded && videoFrames.length === 0 && (
               <div className="welcome">
                 <i className="fa-solid fa-cloud-arrow-up welcome__icon"></i>
-                <h2 className="welcome__title">Resim Yükleyin</h2>
-                <p className="welcome__text">Başlamak için sol üstteki butonu kullanın veya sürükleyip bırakın.</p>
+                <h2 className="welcome__title">{t('welcomeTitle')}</h2>
+                <p className="welcome__text">{t('welcomeText')}</p>
               </div>
             )}
             <canvas
@@ -931,7 +1016,7 @@ function App() {
       {/* Frame Gallery - Optimized with thumbnail caching */}
       {/* When manual mode is active, show only manual frames; otherwise show grid frames */}
       <GallerySection
-        image={state.image}
+        image={state.processedImage || state.image}
         frames={state.isManualMode ? state.manualFrames : state.frames}
         isImageLoaded={state.isImageLoaded}
         selectedFrameIndex={state.isManualMode
