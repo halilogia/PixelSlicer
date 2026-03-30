@@ -21,6 +21,7 @@ function App() {
   const [state, setState] = useState(viewModel.getState());
   const [showSettings, setShowSettings] = useState(false);
   const [showVideoUploader, setShowVideoUploader] = useState(false);
+  const [isEyedropperActive, setIsEyedropperActive] = useState(false);
   const [videoFrames, setVideoFrames] = useState<ExtractedFrame[]>([]);
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
   const [extractionProgress, setExtractionProgress] = useState(0);
@@ -378,16 +379,84 @@ function App() {
     );
   }, [state.image, state.currentFrame, state.frames, state.manualFrames, state.previewZoom, state.singlePreviewFrameIndex, state.isPlaying]);
 
-  // Handle image upload
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Handle image upload with auto-grid stitching
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const img = new Image();
-    img.onload = () => {
-      viewModel.setImage(img);
-    };
-    img.src = URL.createObjectURL(file);
+    if (files.length === 1) {
+      // Single image - work as before
+      const file = files[0];
+      const img = new Image();
+      img.onload = () => {
+        viewModel.setImage(img);
+      };
+      img.src = URL.createObjectURL(file);
+    } else {
+      // Multiple images - stitch them into a grid
+      const fileList = Array.from(files);
+      const images: HTMLImageElement[] = [];
+
+      // Load all images
+      await Promise.all(fileList.map(file => {
+        return new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            images.push(img);
+            resolve();
+          };
+          img.src = URL.createObjectURL(file);
+        });
+      }));
+
+      if (images.length === 0) return;
+
+      // Grid calculation (max 8 columns)
+      const cols = Math.min(images.length, 8);
+      const rows = Math.ceil(images.length / cols);
+      
+      // Calculate layout: find max width and max height of any single frame
+      let maxFrameW = 0;
+      let maxFrameH = 0;
+      for (const img of images) {
+        maxFrameW = Math.max(maxFrameW, img.naturalWidth);
+        maxFrameH = Math.max(maxFrameH, img.naturalHeight);
+      }
+
+      // Create combined grid canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = cols * maxFrameW;
+      canvas.height = rows * maxFrameH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Draw images in grid
+      images.forEach((img, index) => {
+        const r = Math.floor(index / cols);
+        const c = index % cols;
+        const x = c * maxFrameW;
+        const y = r * maxFrameH;
+        
+        // Center image within its grid cell if smaller
+        const offsetX = (maxFrameW - img.naturalWidth) / 2;
+        const offsetY = (maxFrameH - img.naturalHeight) / 2;
+        
+        ctx.drawImage(img, x + offsetX, y + offsetY);
+      });
+
+      // Set as main image
+      const combinedImg = new Image();
+      combinedImg.onload = () => {
+        viewModel.setImage(combinedImg);
+        // Auto-set grid to matching columns and rows
+        viewModel.setGridConfig({
+          cols: cols,
+          rows: rows
+        });
+        viewModel.setSheetColumns(cols);
+      };
+      combinedImg.src = canvas.toDataURL();
+    }
   }, []);
 
   // Handle GIF upload
@@ -465,16 +534,43 @@ function App() {
     downloadBlob(blob, 'animation.gif');
   }, [state.image, state.processedImage, state.fps]);
 
-  // Canvas click handler for frame toggle (when manual mode is OFF)
+  // Canvas click handler for frame toggle or eyedropper
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!state.imageDimensions || state.isManualMode) return;
-    
     const canvas = mainCanvasRef.current;
-    if (!canvas) return;
-    
+    if (!canvas || !state.imageDimensions) return;
+
     const pos = viewModel.getCanvasCoordinates(canvas, e.clientX, e.clientY);
+
+    // Eyedropper Logic
+    if (isEyedropperActive) {
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+
+      // Get pixel color at click point
+      // We need to account for canvas scaling/offset in the viewport 
+      // but getCanvasCoordinates already handles that for image space.
+      // We must draw the current processed/raw image to an offscreen canvas to get pixel data
+      // OR use the main canvas if it's currently showing pixels 1:1.
+      // Best way: Create a small 1x1 canvas and draw the pixel there.
+      const offscreen = document.createElement('canvas');
+      offscreen.width = 1;
+      offscreen.height = 1;
+      const oCtx = offscreen.getContext('2d', { willReadFrequently: true })!;
+      
+      const sourceImage = state.image;
+      if (!sourceImage) return;
+
+      oCtx.drawImage(sourceImage, pos.x, pos.y, 1, 1, 0, 0, 1, 1);
+      const [r, g, b] = oCtx.getImageData(0, 0, 1, 1).data;
+      
+      viewModel.setRemoveBgColor(r, g, b, state.removeBgColor.tolerance);
+      setIsEyedropperActive(false);
+      return;
+    }
+
+    if (state.isManualMode) return;
     
-    // Check if clicking on any frame (grid frames only)
+    // Toggle frame logic
     const allFrames = viewModel.getFrames();
     for (let i = allFrames.length - 1; i >= 0; i--) {
       const f = allFrames[i];
@@ -483,7 +579,7 @@ function App() {
         return;
       }
     }
-  }, [state.imageDimensions, state.isManualMode]);
+  }, [state.imageDimensions, state.isManualMode, isEyedropperActive, state.image, state.removeBgColor.tolerance]);
 
   // Canvas mouse handlers for manual mode
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -637,7 +733,7 @@ function App() {
           </label>
           <label className="btn btn--primary">
             <i className="fa-solid fa-upload"></i> {t('uploadImage')}
-            <input type="file" accept="image/*" className="file-input" onChange={handleImageUpload} />
+            <input type="file" accept="image/*" className="file-input" onChange={handleImageUpload} multiple />
           </label>
           <button
             className="btn btn--secondary settings-btn"
@@ -863,26 +959,40 @@ function App() {
             {state.removeBackground && (
               <div className="effects-controls" style={{ padding: '8px', backgroundColor: 'var(--bg-lighter)', borderRadius: '4px' }}>
                 <div className="form-group" style={{ marginBottom: '8px' }}>
-                  <label className="form-label">{t('colorRgb')}</label>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <input 
-                      type="number" className="form-input" placeholder="R" min="0" max="255"
-                      value={state.removeBgColor.r}
-                      onChange={(e) => viewModel.setRemoveBgColor(parseInt(e.target.value)||0, state.removeBgColor.g, state.removeBgColor.b, state.removeBgColor.tolerance)}
-                      style={{ padding: '4px' }}
-                    />
-                    <input 
-                      type="number" className="form-input" placeholder="G" min="0" max="255"
-                      value={state.removeBgColor.g}
-                      onChange={(e) => viewModel.setRemoveBgColor(state.removeBgColor.r, parseInt(e.target.value)||0, state.removeBgColor.b, state.removeBgColor.tolerance)}
-                      style={{ padding: '4px' }}
-                    />
-                    <input 
-                      type="number" className="form-input" placeholder="B" min="0" max="255"
-                      value={state.removeBgColor.b}
-                      onChange={(e) => viewModel.setRemoveBgColor(state.removeBgColor.r, state.removeBgColor.g, parseInt(e.target.value)||0, state.removeBgColor.tolerance)}
-                      style={{ padding: '4px' }}
-                    />
+                  <label className="form-label">{t('removeColor')}</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', width: '40px', height: '32px' }}>
+                      <input 
+                        type="color" 
+                        value={`#${state.removeBgColor.r.toString(16).padStart(2,'0')}${state.removeBgColor.g.toString(16).padStart(2,'0')}${state.removeBgColor.b.toString(16).padStart(2,'0')}`}
+                        onChange={(e) => {
+                          const hex = e.target.value;
+                          const r = parseInt(hex.slice(1, 3), 16);
+                          const g = parseInt(hex.slice(3, 5), 16);
+                          const b = parseInt(hex.slice(5, 7), 16);
+                          viewModel.setRemoveBgColor(r, g, b, state.removeBgColor.tolerance);
+                        }}
+                        style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                      />
+                      <div style={{ 
+                        width: '100%', height: '100%', 
+                        backgroundColor: `rgb(${state.removeBgColor.r}, ${state.removeBgColor.g}, ${state.removeBgColor.b})`,
+                        borderRadius: '4px', border: '2px solid var(--border-color)'
+                      }} />
+                    </div>
+                    
+                    <button 
+                      className={`btn ${isEyedropperActive ? 'btn--active' : 'btn--secondary'}`}
+                      style={{ padding: '4px 10px', fontSize: '14px' }}
+                      onClick={() => setIsEyedropperActive(!isEyedropperActive)}
+                      title={t('eyedropper')}
+                    >
+                      <i className="fa-solid fa-eye-dropper"></i>
+                    </button>
+                    
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      RGB({state.removeBgColor.r},{state.removeBgColor.g},{state.removeBgColor.b})
+                    </div>
                   </div>
                 </div>
                 <div className="form-group" style={{ marginBottom: '0' }}>
@@ -1007,7 +1117,7 @@ function App() {
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseLeave}
-              style={{ cursor: state.isManualMode ? 'crosshair' : 'default' }}
+              style={{ cursor: isEyedropperActive ? 'cell' : state.isManualMode ? 'crosshair' : 'default' }}
             ></canvas>
           </div>
         </main>

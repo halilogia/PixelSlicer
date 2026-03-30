@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 # Check if dist exists, if not build it
 if [ ! -d "dist" ]; then
     npm install
-    npm run build -- --base=/
+    npm run build
 fi
 
 # Run a local server in the background

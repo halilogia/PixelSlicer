@@ -38,12 +38,8 @@ build/
 
 
 # Project Knowledge & Docs
-docs/
 archive/
-brain/
 Universal-Docs/
-Universal-Docs
-
 .snapshots/
 .agent/
 assets/

@@ -8,7 +8,7 @@ export const translations = {
     appTitle: 'PixelSlicer',
     appSubtitle: 'ONLINE SPRITE CUTTER',
     uploadGif: 'GIF Yükle',
-    uploadImage: 'Resim Yükle',
+    uploadImage: 'Resim(ler) Yükle',
     settings: 'Ayarlar',
 
     // Sidebar - Manual Mode
@@ -41,7 +41,7 @@ export const translations = {
     downloadZip: 'ZIP İndir',
 
     // Main Canvas
-    welcomeTitle: 'Resim Yükleyin',
+    welcomeTitle: 'Resim(leri) Yükleyin',
     welcomeText: 'Başlamak için sol üstteki butonu kullanın veya sürükleyip bırakın.',
 
     // Frame Gallery
@@ -85,6 +85,8 @@ export const translations = {
     // Effects & Export
     effects: 'Efektler',
     removeBackgroundColor: 'Arka Plan Rengini Sil',
+    removeColor: 'Renk Seç',
+    eyedropper: 'Renk Seçici (Damlalık)',
     colorRgb: 'Renk (RGB)',
     tolerance: 'Tolerans',
     downloadGif: 'GIF İndir',
@@ -121,7 +123,7 @@ export const translations = {
     appTitle: 'PixelSlicer',
     appSubtitle: 'ONLINE SPRITE CUTTER',
     uploadGif: 'Upload GIF',
-    uploadImage: 'Upload Image',
+    uploadImage: 'Upload Image(s)',
     settings: 'Settings',
 
     // Sidebar - Manual Mode
@@ -154,7 +156,7 @@ export const translations = {
     downloadZip: 'Download ZIP',
 
     // Main Canvas
-    welcomeTitle: 'Upload Image',
+    welcomeTitle: 'Upload Image(s)',
     welcomeText: 'Use the button at top left or drag and drop to start.',
 
     // Frame Gallery
@@ -198,6 +200,8 @@ export const translations = {
     // Effects & Export
     effects: 'Effects',
     removeBackgroundColor: 'Remove Background Color',
+    removeColor: 'Select Color',
+    eyedropper: 'Eyedropper Tool',
     colorRgb: 'Color (RGB)',
     tolerance: 'Tolerance',
     downloadGif: 'Download GIF',
