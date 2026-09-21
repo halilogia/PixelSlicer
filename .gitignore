@@ -43,3 +43,8 @@ Universal-Docs/
 .snapshots/
 .agent/
 assets/
+archives/
+archive/
+
+# Agent Internal Brain & Scratch
+brain/
