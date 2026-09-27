@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   composeFrameCell,
   cropFrame,
@@ -24,6 +24,41 @@ function buffer(): PixelBuffer {
   }
   return { width: 4, height: 2, data };
 }
+
+describe('native ImageData', () => {
+  afterEach(() => {
+    delete (globalThis as { ImageData?: unknown }).ImageData;
+  });
+
+  it('returns a real ImageData when the browser has one', () => {
+    // putImageData brand checks its argument, so a plain object is rejected in
+    // a real browser. Node has no ImageData, so the constructor is faked here.
+    class FakeImageData {
+      colorSpace = 'srgb';
+      constructor(
+        public data: Uint8ClampedArray,
+        public width: number,
+        public height: number
+      ) {}
+    }
+    (globalThis as { ImageData?: unknown }).ImageData = FakeImageData;
+
+    const cropped = cropFrame(buffer(), frame(0, 0, 2, 1));
+    const cell = composeFrameCell(buffer(), frame(0, 0, 1, 1), 3, 3);
+
+    expect(cropped).toBeInstanceOf(FakeImageData);
+    expect(cell).toBeInstanceOf(FakeImageData);
+    expect(cropped.width).toBe(2);
+    expect(cell.width).toBe(3);
+  });
+
+  it('falls back to a plain object when there is no constructor', () => {
+    const cropped = cropFrame(buffer(), frame(0, 0, 1, 1));
+
+    expect(cropped).not.toBeInstanceOf(Object.getPrototypeOf(Uint8ClampedArray));
+    expect(cropped.data).toHaveLength(4);
+  });
+});
 
 describe('selectFrames', () => {
   it('keeps only the active frames when asked', () => {

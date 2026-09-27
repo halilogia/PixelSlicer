@@ -25,8 +25,24 @@ export function frameFileName(index: number): string {
   return `frame_${String(index + 1).padStart(4, '0')}.png`;
 }
 
+/**
+ * Allocate RGBA pixels.
+ *
+ * `putImageData` and `getImageData` brand check their argument, so a plain
+ * object is not enough in a real browser or a worker. Node (the test
+ * environment) has no ImageData constructor, hence the fallback.
+ */
 function createImageData(width: number, height: number): ImageData {
-  return { data: new Uint8ClampedArray(width * height * 4), width, height, colorSpace: 'srgb' } as ImageData;
+  const data = new Uint8ClampedArray(width * height * 4);
+  const Constructor = (globalThis as {
+    ImageData?: new (data: Uint8ClampedArray, width: number, height: number) => ImageData;
+  }).ImageData;
+
+  if (typeof Constructor === 'function') {
+    return new Constructor(data, width, height);
+  }
+
+  return { data, width, height, colorSpace: 'srgb' } as ImageData;
 }
 
 /** Copy one frame out of the sheet, clipped to the buffer. */

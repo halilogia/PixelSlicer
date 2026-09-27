@@ -50,3 +50,6 @@ archive/
 
 # Agent Internal Brain & Scratch
 brain/
+
+test-results/
+playwright-report/

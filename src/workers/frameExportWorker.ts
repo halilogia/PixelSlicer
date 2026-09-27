@@ -1,7 +1,7 @@
 // Frame export worker
 // Encodes the ZIP/GIF export off the main thread on an OffscreenCanvas.
 
-import { createAtlasCanvas, canvasToBlob } from '@infrastructure/atlas/AtlasRenderer';
+import { createAtlasCanvas, canvasToBlob, toNativeImageData } from '@infrastructure/atlas/AtlasRenderer';
 import { composeFrameCell, cropFrame, encodeFramesAsZip, encodeGif, maxFrameSize } from '@infrastructure/ExportPipeline';
 import type {
   FrameExportRequest,
@@ -24,7 +24,7 @@ async function encodePng(imageData: ImageData): Promise<Blob> {
   const ctx = canvas.getContext('2d') as unknown as {
     putImageData(data: ImageData, x: number, y: number): void;
   };
-  ctx.putImageData(imageData, 0, 0);
+  ctx.putImageData(toNativeImageData(imageData), 0, 0);
   return canvasToBlob(canvas, 'image/png');
 }
 

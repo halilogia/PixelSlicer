@@ -2,7 +2,7 @@
 // Canvas access + Blob management, delegating the encoding to ExportPipeline
 
 import type { Frame } from '@domain/FrameLogic';
-import { createAtlasCanvas, canvasToBlob, sourceSize, type AtlasSourceImage } from './atlas/AtlasRenderer';
+import { createAtlasCanvas, canvasToBlob, sourceSize, toNativeImageData, type AtlasSourceImage } from './atlas/AtlasRenderer';
 // The encoding pipeline is loaded on demand: it is only needed when an export
 // actually runs, and the worker has its own copy of it.
 import type { PixelBuffer } from '@domain/atlas/AtlasTypes';
@@ -26,7 +26,7 @@ async function encodePng(imageData: ImageData): Promise<Blob> {
   const ctx = canvas.getContext('2d') as unknown as {
     putImageData(data: ImageData, x: number, y: number): void;
   };
-  ctx.putImageData(imageData, 0, 0);
+  ctx.putImageData(toNativeImageData(imageData), 0, 0);
   return canvasToBlob(canvas, 'image/png');
 }
 

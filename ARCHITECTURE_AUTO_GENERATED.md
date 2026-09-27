@@ -16,7 +16,7 @@ This document provides an automated architectural overview of the application so
 
 ### 📊 Codebase Statistics
 - **Total source files**: `76`
-- **Total lines of code (non-empty)**: `11116`
+- **Total lines of code (non-empty)**: `11178`
 - **UI components (.tsx)**: `13`
 - **Custom hooks**: `7`
 - **Domain modules**: `15`
@@ -32,6 +32,7 @@ This document provides an automated architectural overview of the application so
 - `omggif`
 - `react`
 - `react-dom`
+- `@playwright/test`
 - `@testing-library/dom`
 - `@testing-library/react`
 - `@types/omggif`

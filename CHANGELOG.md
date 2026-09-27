@@ -14,6 +14,7 @@ All notable changes to the PixelSlicer project will be documented in this file.
 - **Gathered canvas state** (`F-008`): the main draw only touches `strokeStyle` / `fillStyle` / `font` / `lineWidth` when the value really changes.
 
 ### Added
+- `npm run test:e2e`: Playwright smoke tests in real Chromium — upload a generated fixture sheet, slice it, toggle a frame, build a trimmed atlas, download the atlas ZIP, and export the frame ZIP + animated GIF through the worker (4 tests, running in CI).
 - `npm run bench`: Vitest benchmarks for the atlas pipeline and the editor state at 100 / 500 / 1000 frames, with the baseline recorded in `docs/BENCHMARKS.md`.
 - `ExportPipeline`: the pixel and encoding half of the ZIP/GIF export, shared by the main thread and the worker.
 - Tests: 113 → **277**. `FrameLogic` 5.78% → 100%, `domain/video` 0% → 96%, `ExportService` 0% → 98%, `EditorViewModel` at 96%. Coverage now measures all of `src` with per area floors.
@@ -21,6 +22,7 @@ All notable changes to the PixelSlicer project will be documented in this file.
 - A shimmer placeholder while thumbnails are still generating (respects `prefers-reduced-motion`).
 
 ### Fixed
+- **ZIP and GIF export were completely broken in the browser**: `putImageData` brand checks its argument, and the pixel producers returned a plain object. Found by the Playwright suite, fixed with a real `ImageData` (with a Node fallback) plus `toNativeImageData` in every encoder.
 - **State leak**: the `EditorViewModel` constructor shallow copied the default state, so the frame arrays were shared with the module level defaults and `addManualFrame` mutated them.
 - **Object URL leak on unmount**: the thumbnail hook cleanup closed over the first, still empty map, so every URL generated later was never revoked.
 - **Stale frame list**: sharing one cache key between `getFrames()` and `getActiveFrames()` let a frame toggle return a stale list.

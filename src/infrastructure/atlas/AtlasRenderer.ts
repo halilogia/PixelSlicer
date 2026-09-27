@@ -76,6 +76,25 @@ export function readPixelBuffer(source: AtlasSourceImage): PixelBuffer {
   return { width, height, data: imageData.data };
 }
 
+/**
+ * A real `ImageData` instance, which `putImageData` requires: it brand checks
+ * its argument, so a structurally identical object is rejected.
+ */
+export function toNativeImageData(image: ImageData): ImageData {
+  const scope = globalThis as {
+    ImageData?: new (data: Uint8ClampedArray, width: number, height: number) => ImageData;
+  };
+  const Constructor = scope.ImageData;
+  if (typeof Constructor !== 'function') return image;
+
+  // The check is stored in a variable on purpose: an inline `instanceof` makes
+  // TypeScript narrow the image to `never` in the branch that follows.
+  const isNative: boolean = image instanceof Constructor;
+  if (isNative) return image;
+
+  return new Constructor(image.data, image.width, image.height);
+}
+
 /** PNG blob for canvases and for the ImageBitmaps returned by the worker. */
 export async function canvasToBlob(
   page: AtlasPageImage,

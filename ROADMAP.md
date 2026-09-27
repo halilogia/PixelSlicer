@@ -1,32 +1,11 @@
 # 🗺️ Roadmap - PixelSlicer
 
 > Only **future** work lives here. Everything already shipped is recorded in [CHANGELOG.md](CHANGELOG.md).
-> Current state: v2.2.0, 113 tests, 10 test files.
-
-## ⚡ v2.3 — Large Sheet Performance
-
-- [ ] **Benchmark harness first**: a repeatable measurement (100 / 500 / 1000 frames → first paint, gallery scroll FPS, peak memory, export time) so every item below can prove itself instead of guessing.
-- [ ] **Memoize `getFrames()` / `getActiveFrames()`** (`F-007`): version guarded caching so React dependency checks stop seeing a new array on every access. Cheap, and it is the cheapest win of the whole list.
-- [ ] **Selector based ViewModel subscriptions** (`F-003`): today every state change re-renders the whole tree, which is the main cost at 500+ frames. Needs the v2.3 benchmark as an acceptance gate.
-- [ ] **Split the main canvas redraw** (`F-006`): separate structural changes (image, zoom, frames) from visual-only ones (selection, marching ants, hover) so dragging a frame does not repaint everything.
-- [ ] **`toBlob()` + `URL.createObjectURL()` for thumbnails** instead of base64 data URLs: ~33% less memory and faster string handling for large galleries.
-- [ ] **Skeleton / shimmer while thumbnails are generated**: the gallery is blank today while the idle batches run.
-- [ ] **Move the remaining heavy work off the main thread** (`4.2 / 4.4`): thumbnail generation and the ZIP/GIF export paths still block the UI; the atlas builder already proved the worker pattern.
-
-## 🧪 v2.3 — Test Depth
-
-The atlas modules are at 100% / 95%, but the rest of the codebase is effectively untested. This section closes that gap in the order that risks the most.
-
-- [ ] **`FrameLogic` unit tests**: measured **5.78%** statement coverage on the core grid math (`calculateGridFrames`, `createManualFrame`, `resizeFrame`, `getResizeHandleAt`). This is the heart of the tool and a regression here silently corrupts every export. Highest test priority in the project.
-- [ ] **`domain/video` unit tests**: 0% coverage on `Video.ts` and `VideoValidation.ts` (file size limits, codec checks, preset maths).
-- [ ] **`EditorViewModel` frame lifecycle tests**: grid/manual frames, drag, resize, delete, re-indexing, pivot and trim state. The animation loop is already covered since 2.2.0.
-- [ ] **Widen the coverage scope**: `vitest.config.ts` currently measures only `src/domain/**` and `src/infrastructure/atlas/**`, so `ImageLoader`, `ExportService`, `GifService` and all of `src/presentation` are invisible to the report.
-- [ ] **Coverage thresholds in CI** once the scope is widened, with a floor that cannot silently regress.
-- [ ] **Component tests on jsdom/happy-dom** for `App.tsx` and both modals: open the atlas packer, change an option, export.
-- [ ] **Golden tests for `ExportService`**: one small fixture sheet with byte compared ZIP/GIF output.
-- [ ] **Playwright smoke test**: upload a sheet → build an atlas → download the ZIP.
+> Current state: v2.3.0, 277 unit/component tests, 4 Playwright smoke tests, 35% line coverage.
 
 ## 🎨 v2.4 — Atlas Packer Round Two
+
+The packer works and is fast; what is missing is depth for real projects.
 
 - [ ] **Preview every page**, not only the first one, with per-page zoom in the modal.
 - [ ] **Editable sprite names**: a prefix + start index field instead of hardcoded `frame_0001`, plus inline rename (names are the keys in every exported descriptor).
@@ -35,11 +14,23 @@ The atlas modules are at 100% / 95%, but the rest of the codebase is effectively
 - [ ] **Native Unity `.spriteatlas` asset** output (`.meta` + GUID generation) so users do not need the bundled editor script.
 - [ ] **Warn on empty / duplicate frames** before packing instead of emitting 1×1 placeholders silently.
 - [ ] **Starling XML + Starling JSON** exporters (same descriptor pipeline, ~50 lines each).
+- [ ] **Sprite sheet import** (read an atlas back into the editor) for Godot / Unity round trips.
+
+## 🧪 v2.4 — Test Depth
+
+- [ ] **Component tests for `App.tsx`**: the sidebar controls, the manual frame gestures and the settings modal are still only covered by the Playwright smoke test.
+- [ ] **Golden tests for the ZIP and GIF byte output** with a real (tiny) fixture sheet, asserted through JSZip, so a codec change cannot silently alter the files.
+- [ ] **Component tests for the Atlas Packer modal**: every option, the multi-page case and the error path.
+- [ ] **Widen the coverage scope further**: `src/App.tsx`, the video infrastructure and the hooks are still the biggest uncovered blocks (see the coverage report).
+- [ ] **Coverage thresholds for the new areas** once they are covered, so the floor can keep rising.
+- [ ] **Extend the e2e suite**: manual frame drawing, pivot picking, GIF upload, video upload.
 
 ## 🧹 v2.4 — Housekeeping
 
-- [ ] **Delete the dead `src/components/Icons.tsx`** and drop the unused `lucide-react` dependency: the file is not imported anywhere and the UI uses FontAwesome, so the dependency only costs bundle budget and confusion. (`framer-motion` is genuinely used by the video uploader.)
-- [ ] **Re-run `npm run docs:arch`** whenever the folder layout changes and keep the generated report in the commit.
+- [ ] **Extract the sidebar** out of `App.tsx` (1379 lines) and give it its own selector subscriptions, so a canvas interaction no longer re-renders 200 controls.
+- [ ] **`updateProcessedImage` in a worker**: the background colour removal still walks the whole sheet on the main thread.
+- [ ] **Move the single frame download and the sprite sheet export** behind the same worker pipeline for consistency.
+- [ ] **Registry of test ids**: the Playwright specs currently rely on a handful of `data-testid`s added ad hoc.
 
 ## 🧑‍💻 v3.0 — Editor Power Features
 
@@ -48,19 +39,24 @@ The atlas modules are at 100% / 95%, but the rest of the codebase is effectively
 - [ ] **Keyboard shortcuts** for the frequent actions (toggle frame, delete, nudge, zoom, play/pause).
 - [ ] **Per-frame properties panel** (name, pivot, trimmed bounds) in a right hand inspector.
 - [ ] **Sprite viewer**: zoom into a single frame at 8×+ with a pixel grid, to place pivots precisely.
+- [ ] **Gallery virtualization** (`4.1`): only the visible tiles are reconciled, so a 1000 frame sheet scrolls smoothly.
 - [ ] **Additional UI languages** (the i18n layer is ready, only the strings are missing).
 
 ## 💡 Ideas
 
 - [ ] Diff based repack: keep the previous atlas layout and only re-pack what actually changed.
 - [ ] 2× / 3× retina atlas export from a single source sheet.
-- [ ] Sprite sheet *import* for Godot / Unity round trips (read an atlas back into the editor).
 - [ ] Texture compression hints (BC3 / ETC2 recommended settings per target engine).
+- [ ] A dark/light theme switch (only the dark palette exists today).
+- [ ] Local project history in `localStorage` as a stopgap for undo/redo.
 
 ## 📌 Engineering Rules
 
 - Domain layer stays pure and fully unit tested; no DOM, no React.
 - Every new engine descriptor gets an exact-output test.
 - Canvas / Worker APIs are stubbed in `src/testUtils`, never mocked ad hoc in a test file.
-- Object URLs go through `ImageLoader`, timers through `requestAnimationFrame`.
-- `npm run lint && npm test && npm run build` must pass before anything is pushed.
+- Object URLs go through `ImageLoader` / the thumbnail hook, timers through `requestAnimationFrame`.
+- Frame arrays stay immutable: their identity is the cache key.
+- Pixel producers return a real `ImageData`: `putImageData` brand checks its argument.
+- Performance claims need `npm run bench`, browser claims need `npm run test:e2e`.
+- `npm run lint && npm test && npm run test:e2e && npm run build` must pass before anything is pushed.

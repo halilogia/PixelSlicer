@@ -840,7 +840,7 @@ function App() {
           </label>
           <label className="btn btn--primary">
             <i className="fa-solid fa-upload"></i> {t('uploadImage')}
-            <input type="file" accept="image/*" className="file-input" onChange={handleImageUpload} multiple />
+            <input type="file" accept="image/*" className="file-input" data-testid="image-upload-input" onChange={handleImageUpload} multiple />
           </label>
           <button
             className="btn btn--secondary settings-btn"
@@ -1196,6 +1196,7 @@ function App() {
               style={{ width: '100%', marginTop: '8px', backgroundColor: '#bb9af7', color: '#1a1b26' }}
               onClick={() => setShowAtlas(true)}
               disabled={!state.image}
+              data-testid="atlas-open"
             >
               <i className="fa-solid fa-layer-group"></i> {t('atlasOpen')}
             </button>

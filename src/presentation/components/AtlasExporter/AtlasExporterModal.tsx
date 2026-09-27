@@ -319,19 +319,20 @@ export function AtlasExporterModal({
                 <button
                   className="btn btn--primary"
                   onClick={build}
+                  data-testid="atlas-build"
                   disabled={isBuilding || activeFrames.length === 0}
                 >
                   <i className="fa-solid fa-wand-magic-sparkles"></i>{' '}
                   {isBuilding ? t('atlasBuilding') : t('atlasBuild')}
                 </button>
                 {result && (
-                  <span className="atlas__badge">
+                  <span className="atlas__badge" data-testid="atlas-worker-badge">
                     {result.usedWorker ? t('atlasWorkerBadge') : t('atlasMainThreadBadge')}
                   </span>
                 )}
               </div>
 
-              <div className="atlas__canvas-wrap canvas-bg">
+              <div className="atlas__canvas-wrap canvas-bg" data-testid="atlas-preview">
                 <canvas ref={previewRef} className="atlas__canvas" />
                 {!result && (
                   <p className="atlas__hint atlas__hint--center">{t('atlasPreviewHint')}</p>
@@ -339,7 +340,7 @@ export function AtlasExporterModal({
               </div>
 
               {result && (
-                <div className="atlas__stats">
+                <div className="atlas__stats" data-testid="atlas-stats">
                   <div className="atlas__stat">
                     <span>{t('atlasSprites')}</span>
                     <strong>{result.layout.sprites.length}</strong>
@@ -365,6 +366,7 @@ export function AtlasExporterModal({
               <button
                 className="btn btn--success atlas__export"
                 onClick={handleExport}
+                data-testid="atlas-export"
                 disabled={!result || isExporting || formats.length === 0}
               >
                 <i className="fa-solid fa-file-zipper"></i>{' '}

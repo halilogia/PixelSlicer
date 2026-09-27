@@ -3,7 +3,7 @@
 
 import type { Frame } from '@domain/FrameLogic';
 import type { PixelBuffer } from '@domain/atlas/AtlasTypes';
-import { createAtlasCanvas } from './atlas/AtlasRenderer';
+import { createAtlasCanvas, toNativeImageData } from './atlas/AtlasRenderer';
 import type { ExportMode, FrameExportRequest, FrameExportResponse } from './FrameExportProtocol';
 
 export interface FrameExportOptions {
@@ -74,7 +74,7 @@ export class FrameExportWorkerClient {
     const ctx = canvas.getContext('2d') as unknown as {
       putImageData(data: ImageData, x: number, y: number): void;
     };
-    ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(toNativeImageData(imageData), 0, 0);
 
     if (typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas) {
       return canvas.convertToBlob({ type: 'image/png' });
