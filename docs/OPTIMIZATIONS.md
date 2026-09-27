@@ -783,37 +783,46 @@ const handleGifUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement
 
 ## OPTIMIZATIONS.md İşlemlerinin Durum Kontrolü
 
-Aşağıda [`OPTIMIZATIONS.md`](OPTIMIZATIONS.md:1) dosyasındaki tüm optimizasyonların mevcut koddaki uygulama durumunu bulabilirsiniz:
+Aşağıda rapordaki optimizasyonların **mevcut kodda** uygulanma durumu yer alır.
+Raporun gövdesi 2026-02-28 tarihli denetimdir ve değiştirilmemiştir; canlı kısım bu bölümdür.
 
-### ✅ Uygulanmış Optimizasyonlar
+**Son kontrol: 2026-09-27** (PixelSlicer v2.1.0)
+
+### ✅ Tamamlanan
 
 | ID | Optimizasyon | Durum |
 |----|--------------|-------|
-| **F-001** | Frame Gallery Canvas Oluşturma | ✅ **Uygulandı** - [`useFrameThumbnails.ts`](src/hooks/useFrameThumbnails.ts:1) hook'u kullanılarak thumbnail'ler cache'lendi, [`GallerySection.tsx`](src/components/GallerySection.tsx:1) ve [`FrameThumbnail.tsx`](src/components/FrameThumbnail.tsx:1) ile memoization yapıldı |
-| **F-004** | Canvas Pool | ✅ **Uygulandı** - [`useFrameThumbnails.ts`](src/hooks/useFrameThumbnails.ts:45) içinde her thumbnail için yeni canvas oluşturuluyor (resize sorununu önlemek için) |
+| **F-001** | Frame Gallery Canvas Oluşturma | `useFrameThumbnails` thumbnail'leri idle callback ile toplu üretiyor ve önbelleğe alıyor; `GallerySection` / `FrameThumbnail` ile memoize edildi |
+| **F-010** | Sprite Sheet Hesaplama Hatası | Düzeltildi: `ExportService.ts:71` artık `frame.x + frame.w` değil `frame.w` kullanıyor (eski durum tablosu hatalıydı) |
 
-### ⚠️ Kısmen Uygulanmış Optimizasyonlar
+### ⚠️ Kısmen Tamamlanan
 
-| ID | Optimizasyon | Durum | Notlar |
-|----|--------------|-------|--------|
-| **F-002** | URL.createObjectURL Memory Leak | ⚠️ **Kısmen** - [`useFrameThumbnails.ts`](src/hooks/useFrameThumbnails.ts:167) unmount'ta temizlik var, ancak [`App.tsx`](src/App.tsx:254) `handleImageUpload` ve satır 758-760 `onDrop` handler'da **hâlâ URL.revokeObjectURL yok** |
-| **F-005** | GIF Frame Canvas'ları | ⚠️ **Kısmen** - [`handleGifUpload`](src/App.tsx:262) içinde hâlâ her frame için yeni canvas oluşturuluyor (satır 278-283), tek canvas ile direkt `putImageData` önerisi uygulanmamış |
-| **F-006** | UseEffect Dependency Bloat | ⚠️ **Kısmen** - [`App.tsx`](src/App.tsx:55) canvas çizim useEffect hâlâ 11 dependency içeriyor, visual state ayrımı yapılmamış |
+| ID | Optimizasyon | Durum | Not |
+|----|--------------|-------|-----|
+| **F-002** | URL.createObjectURL Leak | Kısmen | Hook'lar, video servisleri ve `downloadBlob` temizlik yapıyor; `App.tsx` içindeki `handleImageUpload`, GIF handler ve sürükle-bırak yolu hâlâ `revokeObjectURL` çağırmıyor |
+| **F-004** | Canvas Context Cache | Kısmen | Gerçek bir pool yok; atlas pipeline sayfa başına tek canvas kullanıyor ve worker'da `OffscreenCanvas` tercih ediyor, ana iş parçacığı yolunda DOM canvas'a düşüyor |
+| **4.2 / 4.4** | Web Worker + OffscreenCanvas | Kısmen | Atlas trim/paket/raster işi worker'da (`src/workers/atlasWorker.ts`), ana iş parçacığı fallback'i test ediliyor. Thumbnail üretimi, GIF decode ve ZIP/GIF export hâlâ ana iş parçacığında |
+| **4.5** | createImageBitmap | Kısmen | `AtlasWorkerClient` bitmap göndermeden önce `createImageBitmap` kullanıyor; editör yükleme yolu hâlâ `HTMLImageElement` |
+| **F-006** | UseEffect Dependency Bloat | Kısmen | Ana canvas efektinin dependency sayısı arttı (12); görsel-only değişiklikler hâlâ tam yeniden çizim tetikliyor |
 
-### ❌ Uygulanmamış Optimizasyonlar
+### ❌ Yapılmayanlar
 
-| ID | Optimizasyon | Durum | Etki |
-|----|--------------|-------|------|
-| **F-003** | ViewModel Subscription | ❌ Uygulanmadı - [`EditorViewModel.ts`](src/presentation/EditorViewModel.ts:121) hâlâ tüm state değişikliklerinde tüm component tree'i re-render ediyor, selector-based subscription yok |
-| **F-007** | ViewModel Array Spread | ❌ Uygulanmadı - [`getFrames()`](src/presentation/EditorViewModel.ts:108) ve [`getActiveFrames()`](src/presentation/EditorViewModel.ts:112) her çağrıda yeni array oluşturuyor, cache/memoization yok |
-| **F-008** | Canvas Font Batching | ❌ Uygulanmadı - [`App.tsx`](src/App.tsx:192) `ctx.font` ve `ctx.fillStyle` her frame'de tekrar set ediliyor, batching yapılmamış |
-| **F-009** | RAF Animation | ❌ Uygulanmadı - [`EditorViewModel.ts`](src/presentation/EditorViewModel.ts:300) `setInterval` kullanılıyor, `requestAnimationFrame` önerisi uygulanmamış |
-| **F-010** | Sprite Sheet Hesaplama Hatası | ❌ Uygulanmadı - [`ExportService.ts`](src/infrastructure/ExportService.ts:69-70) `maxWidth` hesaplamasında hâlâ `frame.x + frame.w` kullanılıyor, düzeltme yapılmamış |
+| ID | Optimizasyon | Durum |
+|----|--------------|-------|
+| **F-003** | Selector Based Subscription | Yok; `EditorViewModel` hâlâ her değişiklikte tüm state'i yeni nesne olarak yayınlıyor |
+| **F-005** | GIF Frame Canvas'ları | Yok; `handleGifUpload` her kare için ara canvas oluşturuyor |
+| **F-007** | ViewModel Array Spread | Yok; `getFrames()` / `getActiveFrames()` her çağrıda yeni dizi üretiyor |
+| **F-008** | Canvas Font Batching | Yok; `ctx.font` / `ctx.fillStyle` kare döngüsünün içinde |
+| **F-009** | RAF Animation | Yok; `EditorViewModel.startAnimation` `setInterval` kullanıyor |
+| **4.1** | Gallery Virtualization | Yok |
+| **4.3** | State Management Refactor | Yok; ROADMAP v2.3'e taşındı |
 
 ### Özet
 
-- **Tamamlanan:** 2/10
-- **Kısmen Tamamlanan:** 3/10
-- **Tamamlanmamış:** 5/10
+- **Tamamlanan:** 2/10 bulgu + 4/5 derin optimizasyon kısmen
+- **Kısmen:** 5/10
+- **Yapılmayan:** 5/10
 
-**Öncelikli düzeltmeler:** F-002 (memory leak), F-010 (hesaplama hatası), F-009 (animasyon performansı)
+**Öncelikli düzeltmeler:** F-002 (memory leak) → F-009 (animasyon) → F-003 + F-007 (büyük sheet performansı, ROADMAP v2.3)
+
+> 🛡️ Bu artık Vitest ile korunuyor: 100 test (trim, pivot, packer, layout, renderer geometrisi, worker protokolü, exporter çıktıları). Yeni test runner sayesinde bu düzeltmelerden biri regresyon yaratırsa CI yakalar.
