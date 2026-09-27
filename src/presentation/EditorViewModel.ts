@@ -121,6 +121,14 @@ export class EditorViewModel {
   private resizeHandle: 'tl' | 'tr' | 'bl' | 'br' | null = null;
   private initialFrameState: Frame | null = null;
 
+  // Frame list caches: rebuilding a 1000 element array on every read makes the
+  // React dependency checks useless, so the list is memoized per state version.
+  private version = 0;
+  private framesCache: Frame[] = [];
+  private framesCacheVersion = -1;
+  private activeFramesCache: Frame[] = [];
+  private activeFramesCacheVersion = -1;
+
   constructor() {
     // Fresh array instances: the defaults are shared module state and
     // `addManualFrame` mutates the manual list in place.
@@ -132,16 +140,23 @@ export class EditorViewModel {
     return this.state;
   }
 
-  getFrames(): Frame[] {
-    return [...this.state.frames, ...this.state.manualFrames];
+  getFrames(): readonly Frame[] {
+    if (this.framesCacheVersion !== this.version) {
+      this.framesCache = [...this.state.frames, ...this.state.manualFrames];
+      this.framesCacheVersion = this.version;
+    }
+    return this.framesCache;
   }
 
-  getActiveFrames(): Frame[] {
-    // When manual mode is on, only show manual frames
-    if (this.state.isManualMode) {
-      return this.state.manualFrames.filter(f => f.isActive);
+  getActiveFrames(): readonly Frame[] {
+    if (this.activeFramesCacheVersion !== this.version) {
+      // In manual mode the grid frames are hidden, so only manual ones count.
+      this.activeFramesCache = this.state.isManualMode
+        ? this.state.manualFrames.filter(frame => frame.isActive)
+        : this.getFrames().filter(frame => frame.isActive);
+      this.activeFramesCacheVersion = this.version;
     }
-    return this.getFrames().filter(f => f.isActive);
+    return this.activeFramesCache;
   }
 
   // Subscription
@@ -151,6 +166,7 @@ export class EditorViewModel {
   }
 
   private notify(): void {
+    this.version++;
     this.listeners.forEach(listener => listener());
   }
 

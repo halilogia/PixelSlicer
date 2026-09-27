@@ -428,6 +428,54 @@ describe('EditorViewModel canvas coordinates', () => {
   });
 });
 
+describe('EditorViewModel frame list memoization', () => {
+  it('returns the same array until something changes', () => {
+    const model = new EditorViewModel();
+    seedImage(model);
+
+    const frames = model.getFrames();
+    const active = model.getActiveFrames();
+    expect(model.getFrames()).toBe(frames);
+    expect(model.getActiveFrames()).toBe(active);
+
+    // Even a zoom change invalidates the cache, that is what keeps it correct.
+    model.setZoom(2);
+    expect(model.getFrames()).not.toBe(frames);
+    expect(model.getActiveFrames()).not.toBe(active);
+  });
+
+  it('reflects a grid change in the cached list', () => {
+    const model = new EditorViewModel();
+    seedImage(model);
+    expect(model.getFrames()).toHaveLength(8);
+
+    model.setGridConfig({ cols: 2, rows: 1 });
+    expect(model.getFrames()).toHaveLength(2);
+  });
+
+  it('reflects a frame toggle in the active list', () => {
+    const model = new EditorViewModel();
+    seedImage(model);
+    expect(model.getActiveFrames()).toHaveLength(8);
+
+    model.toggleFrameActive(0);
+    expect(model.getActiveFrames()).toHaveLength(7);
+  });
+
+  it('switches the active list when manual mode is toggled', () => {
+    const model = new EditorViewModel();
+    seedImage(model);
+    model.addManualFrame(0, 0, 20, 20);
+    expect(model.getActiveFrames()).toHaveLength(9);
+
+    model.toggleManualMode();
+    expect(model.getActiveFrames()).toEqual(model.getState().manualFrames);
+
+    model.toggleManualMode();
+    expect(model.getActiveFrames()).toHaveLength(9);
+  });
+});
+
 describe('EditorViewModel subscriptions', () => {
   it('notifies listeners until they unsubscribe', () => {
     const model = new EditorViewModel();

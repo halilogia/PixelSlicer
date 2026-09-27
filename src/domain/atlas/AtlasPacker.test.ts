@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   candidatePageSizes,
+  estimatePageSize,
   nextPowerOfTwo,
   packIntoPage,
   packRects,
@@ -112,6 +113,46 @@ describe('candidatePageSizes', () => {
     expect(sizes[0]).toEqual({ width: 16, height: 16 });
     expect(sizes.some(size => size.width === 24)).toBe(true);
     sizes.forEach(size => expect(size.width).toBeLessThanOrEqual(64));
+  });
+});
+
+describe('estimatePageSize', () => {
+  it('estimates a power of two page that can really hold the sprites', () => {
+    const inputs = rects(100, 32, 32);
+    const estimate = estimatePageSize(inputs, true, 4096);
+
+    expect(estimate).not.toBeNull();
+    expect(nextPowerOfTwo(estimate!.width)).toBe(estimate!.width);
+    expect(nextPowerOfTwo(estimate!.height)).toBe(estimate!.height);
+    expect(packIntoPage(inputs, estimate!.width, estimate!.height)).not.toBeNull();
+  });
+
+  it('stays balanced instead of producing a long thin strip', () => {
+    // 100 sprites of 32px fill an 8x16 grid, so 256x512 is the honest answer.
+    // Anything near square would be a 4x wasted page, anything thinner is a strip.
+    const estimate = estimatePageSize(rects(100, 32, 32), true, 4096)!;
+    const ratio = estimate.width / estimate.height;
+
+    expect(estimate).toEqual({ width: 256, height: 512 });
+    expect(ratio).toBeGreaterThanOrEqual(0.5);
+    expect(ratio).toBeLessThanOrEqual(2);
+  });
+
+  it('works for an exact (non power of two) page too', () => {
+    const inputs = rects(100, 32, 32);
+    const estimate = estimatePageSize(inputs, false, 4096);
+
+    expect(estimate).not.toBeNull();
+    expect(packIntoPage(inputs, estimate!.width, estimate!.height)).not.toBeNull();
+  });
+
+  it('returns null when no page within the limit can hold them', () => {
+    expect(estimatePageSize(rects(8, 64, 64), true, 128)).toBeNull();
+    expect(estimatePageSize(rects(64, 64, 64), true, 128)).toBeNull();
+  });
+
+  it('returns null without sprites', () => {
+    expect(estimatePageSize([], true, 512)).toBeNull();
   });
 });
 

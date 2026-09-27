@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "bench": "vitest bench --run",
     "docs:arch": "node scripts/generate-architecture-report.mjs"
   },
   "dependencies": {

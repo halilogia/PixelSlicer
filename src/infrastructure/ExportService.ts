@@ -10,7 +10,7 @@ import { GIFEncoder, quantize, applyPalette } from 'gifenc';
  */
 export async function exportAsZip(
   image: HTMLImageElement | HTMLCanvasElement,
-  frames: Frame[],
+  frames: readonly Frame[],
   activeOnly: boolean = true
 ): Promise<Blob> {
   const zip = new JSZip();
@@ -50,7 +50,7 @@ export async function exportAsZip(
  */
 export async function exportAsSpriteSheet(
   image: HTMLImageElement | HTMLCanvasElement,
-  frames: Frame[],
+  frames: readonly Frame[],
   columns: number,
   activeOnly: boolean = true
 ): Promise<Blob> {
@@ -132,7 +132,7 @@ export async function exportSingleFrame(
  */
 export async function exportAsGif(
   image: HTMLImageElement | HTMLCanvasElement,
-  frames: Frame[],
+  frames: readonly Frame[],
   fps: number,
   activeOnly: boolean = true
 ): Promise<Blob> {

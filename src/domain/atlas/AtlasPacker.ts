@@ -241,6 +241,72 @@ export function candidatePageSizes(
 }
 
 /**
+ * Cheap shelf packing estimate of a page size that can hold everything.
+ * MaxRects always beats the shelf, so this is only a *guess* used to try the
+ * most promising page first: on a 1000 sprite sheet the ascending search pays
+ * for several full MaxRects attempts that are guaranteed to fail.
+ *
+ * The most square feasible page wins, which keeps a uniform sheet from being
+ * packed into a 32x4096 strip.
+ */
+export function estimatePageSize(
+  inputs: PackInput[],
+  powerOfTwo: boolean,
+  maxPageSize: number
+): { width: number; height: number } | null {
+  if (inputs.length === 0) return null;
+
+  const ordered = [...inputs].sort((a, b) => b.height - a.height || b.width - a.width);
+  const tallest = ordered[0].height;
+  const round = (value: number): number =>
+    powerOfTwo
+      ? Math.min(maxPageSize, nextPowerOfTwo(Math.ceil(value)))
+      : Math.min(maxPageSize, Math.ceil(value));
+
+  let best: { width: number; height: number; score: number } | null = null;
+  let width = round(ordered.reduce((max, input) => Math.max(max, input.width), 0));
+
+  while (width <= maxPageSize) {
+    let rows = 1;
+    let used = 0;
+    let fitsWidth = true;
+
+    for (const input of ordered) {
+      if (input.width > width) {
+        fitsWidth = false;
+        break;
+      }
+      if (used + input.width > width) {
+        rows++;
+        used = 0;
+      }
+      used += input.width;
+    }
+
+    if (fitsWidth) {
+      // Feasibility is judged on the raw height: clamping before the check
+      // would turn "too tall" into "fits" and waste a MaxRects attempt.
+      const rawHeight = rows * tallest;
+      if (rawHeight <= maxPageSize) {
+        const height = round(rawHeight);
+        const score = Math.abs(Math.log(width / height));
+        const better =
+          best === null ||
+          score < best.score - 1e-9 ||
+          (Math.abs(score - best.score) <= 1e-9 && width * height < best.width * best.height);
+        if (better) best = { width, height, score };
+      }
+    }
+
+    const grown = powerOfTwo ? width * 2 : Math.ceil(width * 1.5);
+    if (grown <= width) break;
+    width = grown;
+  }
+
+  return best ? { width: best.width, height: best.height } : null;
+}
+
+/**
  * Pack every input, splitting into as many pages as needed.
  * Inputs are sorted by area (descending) while packing and restored to the
  * original order in the result, so exported metadata stays deterministic.
@@ -268,7 +334,13 @@ export function packRects(inputs: PackInput[], options: PackRectsOptions): Packe
 
   const minWidth = ordered.reduce((max, input) => Math.max(max, input.width), 0);
   const minHeight = ordered.reduce((max, input) => Math.max(max, input.height), 0);
-  const candidates = candidatePageSizes(minWidth, minHeight, maxPageSize, powerOfTwo);
+  const ascending = candidatePageSizes(minWidth, minHeight, maxPageSize, powerOfTwo);
+
+  // Try the estimated page first, then walk the candidates from the smallest up.
+  const estimate = estimatePageSize(ordered, powerOfTwo, maxPageSize);
+  const candidates = estimate
+    ? [estimate, ...ascending.filter(size => size.width !== estimate.width || size.height !== estimate.height)]
+    : ascending;
 
   const pages: PackedPage[] = [];
   let remaining = ordered;
