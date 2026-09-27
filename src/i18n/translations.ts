@@ -155,6 +155,23 @@ export const translations = {
     play: 'Oynat',
     pause: 'Duraklat',
     fitScreen: 'Ekrana Sığdır',
+
+    // History
+    history: 'Geçmiş',
+    undo: 'Geri Al',
+    redo: 'İleri Al',
+    historyShortcuts: 'Kısayollar: Ctrl+Z / Ctrl+Y, Boşluk oynat, Delete kareyi silir, ok tuşları kaydırır.',
+
+    // Project
+    project: 'Proje',
+    saveProject: 'Kaydet',
+    loadProject: 'Aç',
+    projectLoaded: 'Proje yüklendi.',
+    projectLoadFailed: 'Proje yüklenemedi.',
+
+    // Theme
+    theme: 'Tema',
+
   },
 
   en: {
@@ -309,6 +326,23 @@ export const translations = {
     play: 'Play',
     pause: 'Pause',
     fitScreen: 'Fit to Screen',
+
+    // History
+    history: 'History',
+    undo: 'Undo',
+    redo: 'Redo',
+    historyShortcuts: 'Shortcuts: Ctrl+Z / Ctrl+Y, Space plays, Delete removes the frame, arrows nudge it.',
+
+    // Project
+    project: 'Project',
+    saveProject: 'Save',
+    loadProject: 'Open',
+    projectLoaded: 'Project loaded.',
+    projectLoadFailed: 'Could not load the project.',
+
+    // Theme
+    theme: 'Theme',
+
   },
 } as const;
 

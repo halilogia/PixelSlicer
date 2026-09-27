@@ -2,6 +2,31 @@
 
 All notable changes to the PixelSlicer project will be documented in this file.
 
+## [3.0.0] - 2026-09-27
+
+The editor finally remembers what you did, and it remembers what you were working on.
+
+### Added
+- **Undo / redo**: a bounded history (50 steps) over the document slices, not the view. A gesture (draw, drag, resize) collapses into one step, a cancelled gesture leaves no entry, and the history is cleared when a new sheet is loaded. Undo, redo, `canUndo` and `canRedo` live in the `EditorViewModel`, with buttons in the sidebar.
+- **Keyboard shortcuts**: `Ctrl/Cmd+Z` undo, `Ctrl/Cmd+Shift+Z` and `Ctrl+Y` redo, `Space` play/pause, `Delete` removes the selected manual frame, `+`/`-` zoom, arrows nudge the selected frame (with `Shift` for a bigger step). Inputs, textareas and selects are left alone.
+- **Project files**: `Save` writes a single self contained `.json` (document + the sheet as a PNG data URL, versioned), `Open` restores it, including the grid, manual frames and every pivot. A file from a newer version is refused with a readable message.
+- **Dark / light theme**: the palette is a set of CSS variables and the new light one is tuned for WCAG AA. The choice follows the system on a first visit, persists, and survives a reload.
+- **Reduced motion support**: `prefers-reduced-motion` now disables every transition and animation in the app, not just the gallery shimmer.
+- **Tests**: 382 → **420** unit/component tests and 32 → **46** browser scenarios. New suites cover the history (28 tests), the project file, the theme and the e2e flows for undo/redo, the shortcuts and a real save/load round trip.
+
+### Fixed
+- **The history lost every grid pivot**: restoring a document recalculated the frames, which rebuilt them and dropped the pivots.
+- **The history survived a new sheet**: loading another image kept the previous frames in the undo stack.
+- **One interaction produced two undo steps**: a grid input updated two slices, so a single undo only reverted half of it. Related changes now run through `viewModel.batch()`.
+- **A cancelled drawing left a no-op history entry.**
+- The theme toggle reused the `settings-btn` class, so anything selecting the settings button by class also hit the theme button.
+- The light palette failed the axe audit: a hardcoded black scrim dimmed the modal content, the zoom bar had a fixed dark surface, the zoom percentage was always white, and the accent colours were too light for a light background. All four now follow the theme.
+
+### Changed
+- The axe audit runs on Chromium only: Firefox and WebKit blend the modal backdrop differently, so the numbers are not comparable across engines. The contrast work is in the palette, not in the test.
+- Playwright pins `colorScheme: 'dark'` and `reducedMotion: 'reduce'` so the suite and the audit are deterministic.
+- `ROADMAP.md` drops the finished items, `docs/KNOWLEDGE.md` documents the history and theme rules.
+
 ## [2.6.0] - 2026-09-27
 
 ### Added

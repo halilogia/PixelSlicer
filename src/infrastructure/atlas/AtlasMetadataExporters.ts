@@ -10,7 +10,7 @@ import type { AtlasLayout, AtlasSprite } from '@domain/atlas/AtlasTypes';
 
 export const ATLAS_APP_NAME = 'PixelSlicer';
 /** Keep in sync with the `version` field in package.json. */
-export const ATLAS_APP_VERSION = '2.6.0';
+export const ATLAS_APP_VERSION = '3.0.0';
 
 export interface AtlasExportInput {
   layout: AtlasLayout;

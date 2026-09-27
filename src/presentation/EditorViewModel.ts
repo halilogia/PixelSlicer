@@ -17,6 +17,27 @@ import type { AtlasSourceImage } from '@infrastructure/atlas/AtlasRenderer';
 
 export type StateListener = () => void;
 
+/**
+ * The slices that undo and redo restore. Everything here describes the document
+ * (the sheet and how it is sliced), never the view.
+ */
+export interface EditorDocument {
+  gridConfig: GridConfig;
+  frames: Frame[];
+  manualFrames: Frame[];
+  isManualMode: boolean;
+  selectedManualFrameIndex: number;
+  pivotMode: PivotMode;
+  sheetColumns: number;
+  removeBackground: boolean;
+  removeBgColor: { r: number; g: number; b: number; tolerance: number };
+  atlasTrim: boolean;
+  atlasAlphaThreshold: number;
+}
+
+/** The history is bounded so a long session cannot grow without limit. */
+const MAX_HISTORY = 50;
+
 export interface EditorState {
   // Image
   image: HTMLImageElement | null;
@@ -138,6 +159,16 @@ export class EditorViewModel {
   /** Guards the asynchronous background removal against out of order results. */
   private processedToken = 0;
 
+  // Undo / redo: only the document slices are recorded, the view state (zoom,
+  // playback, selection) is not part of the history.
+  private undoStack: EditorDocument[] = [];
+  private redoStack: EditorDocument[] = [];
+  /** Set while a gesture (draw, drag, resize) is in flight, to coalesce steps. */
+  private gestureActive = false;
+  /** Nesting depth of batch() calls and whether the batch already recorded. */
+  private batchDepth = 0;
+  private batchRecorded = false;
+
   constructor() {
     // Fresh array instances: the defaults are shared module state and
     // `addManualFrame` mutates the manual list in place.
@@ -186,8 +217,185 @@ export class EditorViewModel {
     this.listeners.forEach(listener => listener());
   }
 
+  // ---------------------------------------------------------------------
+  // Undo / redo
+  // ---------------------------------------------------------------------
+
+  /** The current document, cloned so the history cannot be mutated from under it. */
+  private snapshot(): EditorDocument {
+    return {
+      gridConfig: { ...this.state.gridConfig },
+      frames: this.state.frames.map(frame => ({ ...frame })),
+      manualFrames: this.state.manualFrames.map(frame => ({ ...frame })),
+      isManualMode: this.state.isManualMode,
+      selectedManualFrameIndex: this.state.selectedManualFrameIndex,
+      pivotMode: this.state.pivotMode,
+      sheetColumns: this.state.sheetColumns,
+      removeBackground: this.state.removeBackground,
+      removeBgColor: { ...this.state.removeBgColor },
+      atlasTrim: this.state.atlasTrim,
+      atlasAlphaThreshold: this.state.atlasAlphaThreshold,
+    };
+  }
+
+  private restore(document: EditorDocument): void {
+    this.state.gridConfig = { ...document.gridConfig };
+    this.state.frames = document.frames.map(frame => ({ ...frame }));
+    this.state.manualFrames = document.manualFrames.map(frame => ({ ...frame }));
+    this.state.isManualMode = document.isManualMode;
+    this.state.selectedManualFrameIndex = document.selectedManualFrameIndex;
+    this.state.pivotMode = document.pivotMode;
+    this.state.sheetColumns = document.sheetColumns;
+    this.state.removeBackground = document.removeBackground;
+    this.state.removeBgColor = { ...document.removeBgColor };
+    this.state.atlasTrim = document.atlasTrim;
+    this.state.atlasAlphaThreshold = document.atlasAlphaThreshold;
+    // The frames come from the document: recalculating here would rebuild them
+    // from the grid and drop the pivots.
+  }
+
+  /**
+   * Record the state before a document change. While a gesture is in flight
+   * (draw, drag, resize) only the first call records, so one gesture is one
+   * undo step instead of one per pointer event.
+   */
+  private record(): void {
+    if (this.gestureActive) return;
+
+    // A batch of related changes (a grid input updating two slices) is one step.
+    if (this.batchDepth > 0) {
+      if (this.batchRecorded) return;
+      this.batchRecorded = true;
+    }
+
+    this.undoStack.push(this.snapshot());
+    if (this.undoStack.length > MAX_HISTORY) this.undoStack.shift();
+    this.redoStack = [];
+  }
+
+  /**
+   * Run several document changes as a single undo step and a single render.
+   * Used by the UI when one gesture updates more than one slice.
+   */
+  batch<T>(action: () => T): T {
+    this.batchDepth++;
+    if (this.batchDepth === 1) this.batchRecorded = false;
+
+    try {
+      return action();
+    } finally {
+      this.batchDepth--;
+      if (this.batchDepth === 0) this.notify();
+    }
+  }
+
+  private beginGesture(): void {
+    this.record();
+    this.gestureActive = true;
+  }
+
+  /** True when two documents describe the same sheet and slice. */
+  private sameDocument(a: EditorDocument, b: EditorDocument): boolean {
+    const sameFrames = (left: Frame[], right: Frame[]): boolean =>
+      left.length === right.length &&
+      left.every((frame, index) => {
+        const other = right[index];
+        return (
+          frame.x === other.x &&
+          frame.y === other.y &&
+          frame.w === other.w &&
+          frame.h === other.h &&
+          frame.index === other.index &&
+          frame.isActive === other.isActive &&
+          frame.pivot?.x === other.pivot?.x &&
+          frame.pivot?.y === other.pivot?.y
+        );
+      });
+
+    return (
+      a.gridConfig.cols === b.gridConfig.cols &&
+      a.gridConfig.rows === b.gridConfig.rows &&
+      a.gridConfig.offsetX === b.gridConfig.offsetX &&
+      a.gridConfig.offsetY === b.gridConfig.offsetY &&
+      a.gridConfig.padding === b.gridConfig.padding &&
+      sameFrames(a.frames, b.frames) &&
+      sameFrames(a.manualFrames, b.manualFrames) &&
+      a.isManualMode === b.isManualMode &&
+      a.pivotMode === b.pivotMode &&
+      a.sheetColumns === b.sheetColumns &&
+      a.removeBackground === b.removeBackground &&
+      a.removeBgColor.tolerance === b.removeBgColor.tolerance &&
+      a.removeBgColor.r === b.removeBgColor.r &&
+      a.removeBgColor.g === b.removeBgColor.g &&
+      a.removeBgColor.b === b.removeBgColor.b &&
+      a.atlasTrim === b.atlasTrim &&
+      a.atlasAlphaThreshold === b.atlasAlphaThreshold
+    );
+  }
+
+  private endGesture(): void {
+    this.gestureActive = false;
+    // A gesture that changed nothing (a cancelled drawing, a click without a
+    // move) must not leave a history entry that undoes to the same state.
+    const last = this.undoStack[this.undoStack.length - 1];
+    if (last && this.sameDocument(last, this.snapshot())) {
+      this.undoStack.pop();
+    }
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  undo(): boolean {
+    const previous = this.undoStack.pop();
+    if (!previous) return false;
+
+    this.redoStack.push(this.snapshot());
+    this.gestureActive = false;
+    this.restore(previous);
+    this.notify();
+    return true;
+  }
+
+  redo(): boolean {
+    const next = this.redoStack.pop();
+    if (!next) return false;
+
+    this.undoStack.push(this.snapshot());
+    this.gestureActive = false;
+    this.restore(next);
+    this.notify();
+    return true;
+  }
+
+  /** Drop the history, used when a new document replaces the current one. */
+  clearHistory(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+    this.gestureActive = false;
+  }
+
+  /** The document as a plain object, for saving or diffing. */
+  getDocument(): EditorDocument {
+    return this.snapshot();
+  }
+
+  /** Replace the document without recording a history entry. */
+  loadDocument(document: EditorDocument): void {
+    this.restore(document);
+    this.clearHistory();
+    this.notify();
+  }
+
   // Image operations
   setImage(image: HTMLImageElement): void {
+    // A new sheet is a new document, the old history must not survive it.
+    this.clearHistory();
     this.state.image = image;
     this.state.imageDimensions = {
       width: image.naturalWidth,
@@ -214,6 +422,7 @@ export class EditorViewModel {
 
   // Grid operations
   setGridConfig(config: Partial<GridConfig>): void {
+    this.record();
     this.state.gridConfig = { ...this.state.gridConfig, ...config };
     this.recalculateFrames();
     this.notify();
@@ -230,12 +439,14 @@ export class EditorViewModel {
 
   // Manual frame operations
   toggleManualMode(): void {
+    this.record();
     this.state.isManualMode = !this.state.isManualMode;
     this.state.selectedManualFrameIndex = -1;
     this.notify();
   }
 
   addManualFrame(startX: number, startY: number, endX: number, endY: number): void {
+    this.record();
     if (!this.state.imageDimensions) return;
     
     const frame = createManualFrame(
@@ -279,12 +490,14 @@ export class EditorViewModel {
   }
 
   clearManualFrames(): void {
+    this.record();
     this.state.manualFrames = [];
     this.state.selectedManualFrameIndex = -1;
     this.notify();
   }
 
   deleteManualFrame(index: number): void {
+    this.record();
     if (index >= 0 && index < this.state.manualFrames.length) {
       // Drop the frame and re-index the rest in one immutable step
       this.state.manualFrames = this.state.manualFrames
@@ -311,6 +524,7 @@ export class EditorViewModel {
 
   // Frame activation
   toggleFrameActive(index: number): void {
+    this.record();
     const allFrames = this.getFrames();
     if (index >= 0 && index < allFrames.length) {
       const newIsActive = !allFrames[index].isActive;
@@ -418,12 +632,14 @@ export class EditorViewModel {
 
   // Export settings
   setSheetColumns(columns: number): void {
+    this.record();
     this.state.sheetColumns = Math.max(1, columns);
     this.notify();
   }
 
   // Atlas packer & pivot
   setPivotMode(mode: PivotMode): void {
+    this.record();
     this.state.pivotMode = mode;
     this.notify();
   }
@@ -434,11 +650,13 @@ export class EditorViewModel {
   }
 
   setAtlasTrim(enabled: boolean): void {
+    this.record();
     this.state.atlasTrim = enabled;
     this.notify();
   }
 
   setAtlasAlphaThreshold(value: number): void {
+    this.record();
     this.state.atlasAlphaThreshold = Math.max(0, Math.min(255, value));
     this.notify();
   }
@@ -448,6 +666,7 @@ export class EditorViewModel {
    * `index` is the position inside getFrames(), grid frames first.
    */
   setFramePivot(index: number, pivot: Pivot | null): void {
+    this.record();
     const gridCount = this.state.frames.length;
     const isManual = index >= gridCount;
     const localIndex = isManual ? index - gridCount : index;
@@ -484,6 +703,7 @@ export class EditorViewModel {
   }
 
   clearFramePivots(): void {
+    this.record();
     const strip = (frame: Frame): Frame => {
       if (!frame.pivot) return frame;
       const next = { ...frame };
@@ -497,6 +717,7 @@ export class EditorViewModel {
   
   // Reset fine-tune settings
   resetFineTune(): void {
+    this.record();
     this.state.gridConfig.offsetX = 0;
     this.state.gridConfig.offsetY = 0;
     this.state.gridConfig.padding = 0;
@@ -506,6 +727,7 @@ export class EditorViewModel {
   
   // Effects settings
   toggleRemoveBackground(): Promise<void> {
+    this.record();
     this.state.removeBackground = !this.state.removeBackground;
     this.notify();
     // Awaitable so callers and tests can wait for the worker round trip.
@@ -513,6 +735,7 @@ export class EditorViewModel {
   }
 
   setRemoveBgColor(r: number, g: number, b: number, tolerance: number): Promise<void> {
+    this.record();
     this.state.removeBgColor = { r, g, b, tolerance };
     if (!this.state.removeBackground) {
       // The colour is also used by the eyedropper preview, so it is published.
@@ -578,6 +801,7 @@ export class EditorViewModel {
   }
   
   startDrawing(x: number, y: number): void {
+    this.beginGesture();
     this._isDrawing = true;
     this.drawStartX = x;
     this.drawStartY = y;
@@ -658,6 +882,7 @@ export class EditorViewModel {
     this._isDrawing = false;
     this.state.isDrawing = false;
     this.notify();
+    this.endGesture();
   }
   
   cancelDrawing(): void {
@@ -676,9 +901,11 @@ export class EditorViewModel {
     this._isDrawing = false;
     this.state.isDrawing = false;
     this.notify();
+    this.endGesture();
   }
   
   startDrag(x: number, y: number): void {
+    this.beginGesture();
     this._isDragging = true;
     this.dragStartX = x;
     this.dragStartY = y;
@@ -715,9 +942,11 @@ export class EditorViewModel {
   endDrag(): void {
     this._isDragging = false;
     this.notify();
+    this.endGesture();
   }
   
   startResize(handle: 'tl' | 'tr' | 'bl' | 'br', x: number, y: number): void {
+    this.beginGesture();
     const index = this.state.selectedManualFrameIndex;
     if (index < 0 || index >= this.state.manualFrames.length) return;
     
@@ -775,6 +1004,7 @@ export class EditorViewModel {
     this.resizeHandle = null;
     this.initialFrameState = null;
     this.notify();
+    this.endGesture();
   }
 
   // Canvas coordinate conversion

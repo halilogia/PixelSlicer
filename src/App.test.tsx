@@ -98,9 +98,11 @@ describe('App shell', () => {
     render(<App />);
     openSettings();
 
-    fireEvent.click(screen.getByText('Türkçe'));
+    // Both language buttons are always labelled in their own language.
+    fireEvent.click(buttonWith('Türkçe'));
 
     expect(text()).toContain('Resim(ler) Yükle');
+    expect(document.documentElement.lang).toBe('tr');
     expect(window.localStorage.getItem('pixelslicer_lang')).toBe('tr');
   });
 
@@ -111,6 +113,7 @@ describe('App shell', () => {
 
     // Only the language is persisted today, the grid config is not.
     expect(document.documentElement.lang).toBe('tr');
+    expect(text()).toContain('Resim(ler)');
     // The English label is gone, which is the language proof without non ASCII.
     expect(text()).not.toContain('Upload Image(s)');
     expect(window.localStorage.getItem('pixelslicer_lang')).toBe('tr');

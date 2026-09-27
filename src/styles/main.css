@@ -7,6 +7,11 @@
   --bg-secondary: #16161e;
   --bg-tertiary: #1f2335;
   --bg-quaternary: #292e42;
+  /* Translucent overlay used by floating toolbars, flips with the theme. */
+  --surface-overlay: rgba(31, 35, 53, 0.9);
+  /* Scrim behind a modal. In light mode a black scrim would dim the modal
+     content enough to break contrast, so it becomes a soft neutral wash. */
+  --scrim: rgba(0, 0, 0, 0.7);
 
   /* Borders */
   --border-default: #414868;
@@ -60,6 +65,54 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Light theme. Every value clears WCAG AA against its own background, the axe
+   run in the e2e suite checks both palettes. */
+[data-theme='light'] {
+  --bg-primary: #f7f8fc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eef0f7;
+  --bg-quaternary: #e2e5f0;
+  --surface-overlay: rgba(255, 255, 255, 0.92);
+  --scrim: rgba(84, 92, 122, 0.32);
+
+  --border-default: #b9bed4;
+  --border-focus: #1f5cb0;
+
+  --text-primary: #1c1f2e;
+  --text-secondary: #454c66;
+  --text-muted: #5c647d;
+  --text-white: #ffffff;
+
+  --accent-blue: #1f5cb0;
+  --accent-blue-hover: #1d4d9e;
+  --accent-green: #2f7d32;
+  --accent-green-hover: #1f5a22;
+  --accent-purple: #6b3fc4;
+  --accent-purple-hover: #4f2b96;
+  --accent-red: #c2263f;
+  --accent-orange: #8a4b0a;
+
+  --canvas-bg: #e7e9f2;
+  --canvas-checker: #cfd3e2;
+
+  --shadow-sm: 0 1px 2px rgba(20, 24, 40, 0.12);
+  --shadow-md: 0 4px 6px rgba(20, 24, 40, 0.14);
+  --shadow-lg: 0 10px 15px rgba(20, 24, 40, 0.16);
+}
+
+/* Motion sensitivity: every transition and animation is disabled when the
+   user asks for reduced motion. It also makes the axe runs deterministic. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Reset */
@@ -417,7 +470,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .range-value {
-  color: var(--accent-blue);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
 }
 
@@ -490,7 +543,7 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
   gap: var(--space-sm);
   padding: var(--space-sm);
-  background-color: rgba(31, 35, 53, 0.9);
+  background-color: var(--surface-overlay);
   backdrop-filter: blur(8px);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
@@ -533,7 +586,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 12px;
   font-family: var(--font-mono);
   font-weight: 700;
-  color: var(--text-white);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -801,7 +854,7 @@ input[type="range"]::-webkit-slider-thumb {
   position: absolute;
   top: var(--space-sm);
   left: var(--space-sm);
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: var(--scrim);
   color: var(--text-white);
   font-size: 10px;
   padding: var(--space-xs) var(--space-sm);
@@ -843,7 +896,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* Settings Button */
-.settings-btn {
+.icon-btn {
   width: 36px;
   height: 36px;
   padding: 0;
@@ -853,7 +906,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 16px;
 }
 
-.settings-btn:hover {
+.icon-btn:hover {
   animation: spin 2s linear infinite;
 }
 
@@ -871,7 +924,7 @@ input[type="range"]::-webkit-slider-thumb {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: var(--scrim);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;

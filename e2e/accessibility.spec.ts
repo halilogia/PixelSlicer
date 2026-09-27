@@ -55,4 +55,28 @@ test.describe('accessibility', () => {
     await expect(page.getByTestId('atlas-build')).toBeVisible();
     expect(await audit(page, '.modal')).toBe('');
   });
+
+  test('the light palette has no violations', async ({ page }) => {
+    await uploadSheet(page);
+
+    await page.getByTestId('theme-toggle').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    // Wait for the palette to be applied, not just the attribute to be set.
+    await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(247, 248, 252)');
+
+    expect(await audit(page)).toBe('');
+
+    await page.getByTestId('atlas-open').click();
+    await expect(page.getByTestId('atlas-build')).toBeVisible();
+    expect(await audit(page, '.modal')).toBe('');
+  });
+
+  test('the theme choice survives a reload', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('theme-toggle').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  });
 });

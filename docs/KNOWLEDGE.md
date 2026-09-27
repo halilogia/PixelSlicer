@@ -59,14 +59,23 @@ Path alias'ları `tsconfig.json`, `vite.config.ts` ve `vitest.config.ts` içinde
 - Performans değişikliği `npm run bench` ile kanıtlanır, tahminle değil. Taban değerler `docs/BENCHMARKS.md`.
 - React tarafında ağır bileşenler (`GallerySection`) props almak yerine `useEditorSelector` ile kendi slice'ını dinler.
 
-## 8. Erişilebilirlik kuralları
+## 8. Geçmiş (undo) kuralları
 
-- `npm run test:e2e` içindeki axe koşumu boş editörü, yüklü editörü ve atlas modalını WCAG 2.1 A/AA etiketleriyle denetler. Yeni bir kontrol eklerken o koşum yeşil kalmalı.
+- Geçmiş **belge dilimlerini** tutar (`EditorDocument`), görünüm durumunu (zoom, oynatma, seçim) değil. Yeni bir belge dilimi eklenirse `snapshot()` ve `restore()` birlikte güncellenir.
+- Her belge değişikliği `record()` çağırır. Bir etkileşim iki dilimi değiştiriyorsa `batch()` ile tek adımdır; jest (çizim, sürükleme, boyutlandırma) `beginGesture()` / `endGesture()` ile tek adıma iner.
+- `restore()` kareleri **yeniden hesaplamaz**: belge kareleri kendi içinde taşır, yeniden hesaplamak pivot'ları siler.
+- Yeni sheet yüklenince geçmiş temizlenir; iptal edilen bir jest geçmişe hiç giriş bırakmaz (aynı belge karşılaştırması).
+- Klavye kısayolları Ctrl **ve** Cmd'yi kabul eder, form alanlarında devre dışıdır.
+
+## 9. Erişilebilirlik kuralları
+
+- `npm run test:e2e` içindeki axe koşumu boş editörü, yüklü editörü, atlas modalını ve **açık paleti** WCAG 2.1 A/AA etiketleriyle denetler. Yeni bir kontrol eklerken o koşum yeşil kalmalı. (Denetim yalnızca Chromium'da koşar: Firefox ve WebKit modal arka planını farklı harmanlar, sonuçlar motorlar arasında karşılaştırılabilir değil.)
 - **İkon butonlarının erişilebilir adı zorunludur**: `aria-label` + `title`. Süsleme ikonları `aria-hidden="true"` taşır, aksi halde erişilebilir adı bozarlar.
-- **Her form kontrolünün adı olmalı**: `<label for>` ya da `aria-label`. Kayan etiketler (`<label>` + `<input>`) yeterli.
-- Palet WCAG AA'yı geçmeli: gövde metni 4.5:1, büyük metin 3:1. v2.6'da `--text-secondary` / `--text-muted` 2.2-2.9:1 ile kaldığı için `#9aa5ce` / `#7a84a8` değerlerine yükseltildi; açık vurgu renkleri **koyu** metin ister, beyaz değil.
+- **Her form kontrolünün adı olmalı**: `<label for>` ya da `aria-label`.
+- **Her renk CSS değişkeni olmalı.** Sabit bir yüzey (ör. modal scrim'i, zoom barı) açık temada kontrastı kırar; `main.css` içindeki `main.css:3` paletinde iki blok (koyu `:root`, açık `[data-theme='light']`) birlikte güncellenmeli.
+- `prefers-reduced-motion: reduce` tüm geçiş ve animasyonları kapatır; axe koşumları da bu yüzden sabit `reducedMotion: 'reduce'` ile çalışır, aksi halde renkler geçiş ortasında ölçülür.
 
-## 9. Test kuralları
+## 10. Test kuralları
 
 - Vitest, Node ortamında çalışır; tarayıcı API'leri `src/testUtils/` içindeki fixture'lar ile değiştirilir (ad hoc mock yok).
 - React testleri dosya başına `// @vitest-environment happy-dom` ile DOM alır. `document` nesnesinin tamamını stub'lamak testing-library'i kırar: `HTMLCanvasElement.prototype` metotlarını veya `document.createElement`'i spy ile değiştir.

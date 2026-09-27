@@ -3,11 +3,13 @@ import { EditorViewModel } from './presentation/EditorViewModel';
 import { exportAsSpriteSheet, downloadBlob, readSourceBuffer } from './infrastructure/ExportService';
 import { FrameExportWorkerClient } from './infrastructure/FrameExportWorkerClient';
 import { decodeGif } from './infrastructure/GifService';
-import { loadImageFromFile, loadImagesFromFiles } from './infrastructure/ImageLoader';
+import { loadImageFromFile, loadImageFromUrl, loadImagesFromFiles } from './infrastructure/ImageLoader';
+import { parseProject, serializeProject } from './infrastructure/ProjectFile';
 import type { GridConfig } from './domain/FrameLogic';
 import { PIVOT_MODE_LABELS, pivotFromPoint } from './domain/atlas/AtlasPivot';
 import { PIVOT_MODES, type PivotMode } from './domain/atlas/AtlasTypes';
 import { useI18n } from './i18n/useI18n';
+import { applyTheme, getInitialTheme, storeTheme, toggleTheme, type Theme } from './presentation/useTheme';
 import GallerySection from './components/GallerySection';
 import { AtlasExporterModal } from './presentation/components/AtlasExporter';
 import { VideoUploader } from './presentation/components/VideoUploader';
@@ -28,6 +30,8 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showVideoUploader, setShowVideoUploader] = useState(false);
   const [showAtlas, setShowAtlas] = useState(false);
+  const [projectNotice, setProjectNotice] = useState<string | null>(null);
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [isEyedropperActive, setIsEyedropperActive] = useState(false);
   const [videoFrames, setVideoFrames] = useState<ExtractedFrame[]>([]);
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
@@ -569,12 +573,16 @@ function App() {
 
   // Handle grid config changes
   const handleGridChange = useCallback((key: keyof GridConfig, value: number) => {
-    viewModel.setGridConfig({ [key]: value });
-    
-    // Auto-update sheet columns when grid cols change
-    if (key === 'cols') {
-      viewModel.setSheetColumns(value);
-    }
+    // One batch: the sheet columns follow the grid, and both changes are a
+    // single undo step and a single render.
+    viewModel.batch(() => {
+      viewModel.setGridConfig({ [key]: value });
+
+      // Auto-update sheet columns when grid cols change
+      if (key === 'cols') {
+        viewModel.setSheetColumns(value);
+      }
+    });
   }, []);
 
   // Handle export
@@ -594,6 +602,129 @@ function App() {
     },
     [state.image, state.processedImage, state.fps]
   );
+
+  // Handle history
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  const handleToggleTheme = useCallback(() => {
+    setTheme(current => {
+      const next = toggleTheme(current);
+      storeTheme(next);
+      return next;
+    });
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    viewModel.undo();
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    viewModel.redo();
+  }, []);
+
+  // Handle project save and load
+  const handleSaveProject = useCallback(() => {
+    if (!state.image) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = state.imageDimensions?.width ?? state.image.naturalWidth;
+    canvas.height = state.imageDimensions?.height ?? state.image.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(state.processedImage || state.image, 0, 0);
+    const json = serializeProject(
+      viewModel.getDocument(),
+      canvas.toDataURL('image/png'),
+      canvas.width,
+      canvas.height
+    );
+    downloadBlob(new Blob([json], { type: 'application/json' }), 'scene.project.json');
+  }, [state.image, state.imageDimensions, state.processedImage]);
+
+  const handleLoadProject = useCallback(
+    async (file: File) => {
+      try {
+        const project = parseProject(await file.text());
+        const image = await loadImageFromUrl(project.image);
+
+        viewModel.setImage(image);
+        viewModel.loadDocument(project.document);
+        setProjectNotice(
+          t('projectLoaded')
+        );
+      } catch (error) {
+        setProjectNotice(
+          error instanceof Error ? error.message : t('projectLoadFailed')
+        );
+      }
+    },
+    [t]
+  );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // Ctrl on Windows and Linux, Cmd on macOS.
+      const accel = event.ctrlKey || event.metaKey;
+      if (accel && !event.shiftKey && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        viewModel.undo();
+        return;
+      }
+      if (
+        (accel && event.key.toLowerCase() === 'y') ||
+        (accel && event.shiftKey && event.key.toLowerCase() === 'z')
+      ) {
+        event.preventDefault();
+        viewModel.redo();
+        return;
+      }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (!state.isManualMode) return;
+        if (state.selectedManualFrameIndex < 0) return;
+        event.preventDefault();
+        viewModel.deleteManualFrame(state.selectedManualFrameIndex);
+        return;
+      }
+      if (event.key === ' ') {
+        event.preventDefault();
+        if (state.isPlaying) {
+          viewModel.stopAnimation();
+        } else {
+          viewModel.startAnimation();
+        }
+        return;
+      }
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        viewModel.zoomIn();
+        return;
+      }
+      if (event.key === '-') {
+        event.preventDefault();
+        viewModel.zoomOut();
+        return;
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        if (!state.isManualMode || state.selectedManualFrameIndex < 0) return;
+        event.preventDefault();
+        const step = event.shiftKey ? 10 : 1;
+        const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+        const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+        viewModel.startDrag(0, 0);
+        viewModel.updateDrag(dx, dy);
+        viewModel.endDrag();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.isManualMode, state.isPlaying, state.selectedManualFrameIndex]);
 
   const handleExportZip = useCallback(async () => {
     if (!state.image) return;
@@ -843,6 +974,18 @@ function App() {
             <input type="file" accept="image/*" className="file-input" data-testid="image-upload-input" onChange={handleImageUpload} multiple />
           </label>
           <button
+            className="btn btn--secondary icon-btn"
+            aria-label={t('theme')}
+            data-testid="theme-toggle"
+            onClick={handleToggleTheme}
+            title={t('theme')}
+          >
+            <i
+              className={theme === 'dark' ? 'fa-solid fa-moon' : 'fa-solid fa-sun'}
+              aria-hidden="true"
+            ></i>
+          </button>
+          <button
             className="btn btn--secondary settings-btn"
               aria-label={t('settings')}
             onClick={() => setShowSettings(true)}
@@ -930,7 +1073,7 @@ function App() {
             {/* Fine Tune */}
             <div className="sidebar__section" style={{ marginTop: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <h4 style={{ fontSize: '11px', fontWeight: 700, color: '#e0af68', textTransform: 'uppercase' }}>
+                <h4 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-orange)', textTransform: 'uppercase' }}>
                   <i className="fa-solid fa-ruler-combined"></i> {t('fineTune')}
                 </h4>
                 <button
@@ -1202,6 +1345,73 @@ function App() {
               <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('atlasOpen')}
             </button>
           </div>
+
+          {/* History */}
+          <div className="sidebar__section">
+            <h3 className="sidebar__title">
+              <i className="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> {t('history')}
+            </h3>
+            <div className="atlas__row">
+              <button
+                className="btn btn--secondary"
+                style={{ flex: 1 }}
+                onClick={handleUndo}
+                disabled={!viewModel.canUndo()}
+                data-testid="undo"
+              >
+                <i className="fa-solid fa-rotate-left" aria-hidden="true"></i> {t('undo')}
+              </button>
+              <button
+                className="btn btn--secondary"
+                style={{ flex: 1 }}
+                onClick={handleRedo}
+                disabled={!viewModel.canRedo()}
+                data-testid="redo"
+              >
+                <i className="fa-solid fa-rotate-right" aria-hidden="true"></i> {t('redo')}
+              </button>
+            </div>
+            <p className="atlas__hint">{t('historyShortcuts')}</p>
+          </div>
+
+          {/* Project */}
+          <div className="sidebar__section">
+            <h3 className="sidebar__title">
+              <i className="fa-solid fa-folder-open" aria-hidden="true"></i> {t('project')}
+            </h3>
+            <div className="atlas__row">
+              <button
+                className="btn btn--secondary"
+                style={{ flex: 1 }}
+                onClick={handleSaveProject}
+                disabled={!state.image}
+                data-testid="save-project"
+              >
+                <i className="fa-solid fa-floppy-disk" aria-hidden="true"></i> {t('saveProject')}
+              </button>
+              <label className="btn btn--secondary" style={{ flex: 1, margin: 0 }}>
+                <i className="fa-solid fa-folder-open" aria-hidden="true"></i> {t('loadProject')}
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="file-input"
+                  data-testid="load-project"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleLoadProject(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            </div>
+            {projectNotice && (
+              <p className="atlas__hint" data-testid="project-notice">
+                {projectNotice}
+              </p>
+            )}
+          </div>
+
 
           {/* Export Options */}
           <div className="sidebar__section">
