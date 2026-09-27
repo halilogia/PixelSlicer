@@ -429,7 +429,7 @@ describe('EditorViewModel canvas coordinates', () => {
 });
 
 describe('EditorViewModel frame list memoization', () => {
-  it('returns the same array until something changes', () => {
+  it('survives changes that do not touch the frames', () => {
     const model = new EditorViewModel();
     seedImage(model);
 
@@ -438,10 +438,38 @@ describe('EditorViewModel frame list memoization', () => {
     expect(model.getFrames()).toBe(frames);
     expect(model.getActiveFrames()).toBe(active);
 
-    // Even a zoom change invalidates the cache, that is what keeps it correct.
+    // Zoom, selection and playback are irrelevant to the frame lists, so a
+    // component that only cares about frames does not have to re-render.
     model.setZoom(2);
+    model.selectManualFrame(-1);
+    model.setSheetColumns(3);
+    expect(model.getFrames()).toBe(frames);
+    expect(model.getActiveFrames()).toBe(active);
+  });
+
+  it('is invalidated by every frame change', () => {
+    const model = new EditorViewModel();
+    seedImage(model);
+    const frames = model.getFrames();
+
+    model.toggleFrameActive(0);
     expect(model.getFrames()).not.toBe(frames);
-    expect(model.getActiveFrames()).not.toBe(active);
+    expect(model.getActiveFrames()).toHaveLength(7);
+
+    const afterToggle = model.getFrames();
+    model.addManualFrame(0, 0, 20, 20);
+    expect(model.getFrames()).not.toBe(afterToggle);
+  });
+
+  it('reflects a pivot change even though the frame count is unchanged', () => {
+    const model = new EditorViewModel();
+    seedImage(model);
+    const frames = model.getFrames();
+
+    model.setFramePivot(0, { x: 0.25, y: 0.25 });
+
+    expect(model.getFrames()).not.toBe(frames);
+    expect(model.getFrames()[0].pivot).toEqual({ x: 0.25, y: 0.25 });
   });
 
   it('reflects a grid change in the cached list', () => {

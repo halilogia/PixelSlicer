@@ -122,12 +122,17 @@ export class EditorViewModel {
   private initialFrameState: Frame | null = null;
 
   // Frame list caches: rebuilding a 1000 element array on every read makes the
-  // React dependency checks useless, so the list is memoized per state version.
-  private version = 0;
+  // React dependency checks useless, so the list is memoized. The frame arrays
+  // are immutable, their identity is the cache key. Each cache keeps its own
+  // key, otherwise reading one list would mark the other as up to date.
   private framesCache: Frame[] = [];
-  private framesCacheVersion = -1;
+  private framesCacheSource: { frames: readonly Frame[]; manual: readonly Frame[] } | null = null;
   private activeFramesCache: Frame[] = [];
-  private activeFramesCacheVersion = -1;
+  private activeFramesCacheSource: {
+    frames: readonly Frame[];
+    manual: readonly Frame[];
+    manualMode: boolean;
+  } | null = null;
 
   constructor() {
     // Fresh array instances: the defaults are shared module state and
@@ -141,21 +146,29 @@ export class EditorViewModel {
   }
 
   getFrames(): readonly Frame[] {
-    if (this.framesCacheVersion !== this.version) {
-      this.framesCache = [...this.state.frames, ...this.state.manualFrames];
-      this.framesCacheVersion = this.version;
+    const { frames, manualFrames } = this.state;
+    const cache = this.framesCacheSource;
+
+    if (cache?.frames !== frames || cache.manual !== manualFrames) {
+      this.framesCache = [...frames, ...manualFrames];
+      this.framesCacheSource = { frames, manual: manualFrames };
     }
+
     return this.framesCache;
   }
 
   getActiveFrames(): readonly Frame[] {
-    if (this.activeFramesCacheVersion !== this.version) {
+    const { frames, manualFrames, isManualMode } = this.state;
+    const cache = this.activeFramesCacheSource;
+
+    if (cache?.frames !== frames || cache.manual !== manualFrames || cache.manualMode !== isManualMode) {
       // In manual mode the grid frames are hidden, so only manual ones count.
-      this.activeFramesCache = this.state.isManualMode
-        ? this.state.manualFrames.filter(frame => frame.isActive)
+      this.activeFramesCache = isManualMode
+        ? manualFrames.filter(frame => frame.isActive)
         : this.getFrames().filter(frame => frame.isActive);
-      this.activeFramesCacheVersion = this.version;
+      this.activeFramesCacheSource = { frames, manual: manualFrames, manualMode: isManualMode };
     }
+
     return this.activeFramesCache;
   }
 
@@ -166,7 +179,6 @@ export class EditorViewModel {
   }
 
   private notify(): void {
-    this.version++;
     this.listeners.forEach(listener => listener());
   }
 
@@ -227,27 +239,32 @@ export class EditorViewModel {
       this.state.manualFrames.length
     );
     
-    this.state.manualFrames.push(frame);
+    // The frame arrays are always replaced, never mutated in place: their
+    // identity is what invalidates the memoized getters.
+    this.state.manualFrames = [...this.state.manualFrames, frame];
     this.notify();
   }
 
   updateManualFrame(index: number, frame: Frame): void {
     if (index >= 0 && index < this.state.manualFrames.length) {
-      this.state.manualFrames[index] = frame;
+      this.state.manualFrames = this.state.manualFrames.map((current, i) =>
+        i === index ? frame : current
+      );
       this.notify();
     }
   }
 
   resizeManualFrame(
-    index: number, 
-    handle: 'tl' | 'tr' | 'bl' | 'br', 
-    dx: number, 
+    index: number,
+    handle: 'tl' | 'tr' | 'bl' | 'br',
+    dx: number,
     dy: number
   ): void {
     if (index >= 0 && index < this.state.manualFrames.length) {
-      const frame = this.state.manualFrames[index];
-      const resized = resizeFrame(frame, handle, dx, dy);
-      this.state.manualFrames[index] = resized;
+      const resized = resizeFrame(this.state.manualFrames[index], handle, dx, dy);
+      this.state.manualFrames = this.state.manualFrames.map((current, i) =>
+        i === index ? resized : current
+      );
       this.notify();
     }
   }
@@ -265,21 +282,18 @@ export class EditorViewModel {
 
   deleteManualFrame(index: number): void {
     if (index >= 0 && index < this.state.manualFrames.length) {
-      // Remove the frame at the specified index
-      this.state.manualFrames.splice(index, 1);
-      
-      // Update indices of remaining frames
-      this.state.manualFrames.forEach((frame, i) => {
-        frame.index = i;
-      });
-      
+      // Drop the frame and re-index the rest in one immutable step
+      this.state.manualFrames = this.state.manualFrames
+        .filter((_, i) => i !== index)
+        .map((frame, i) => ({ ...frame, index: i }));
+
       // Adjust selected index if necessary
       if (this.state.selectedManualFrameIndex === index) {
         this.state.selectedManualFrameIndex = -1;
       } else if (this.state.selectedManualFrameIndex > index) {
         this.state.selectedManualFrameIndex--;
       }
-      
+
       this.notify();
     }
   }

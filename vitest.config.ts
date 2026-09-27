@@ -15,8 +15,11 @@ export default defineConfig({
     },
   },
   test: {
+    // The domain and infrastructure suites stay in plain Node; files marked with
+    // `@vitest-environment happy-dom` get a DOM for the React tests.
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    setupFiles: ['src/testUtils/setupTests.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

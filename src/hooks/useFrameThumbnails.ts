@@ -239,11 +239,12 @@ export function useFrameThumbnails(
     };
   }, [image, frames, generateThumbnail]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount. The ref is used on purpose: the state value captured
+  // by this effect is the empty map from the first render, so reading it here
+  // would leak every URL generated later.
   useEffect(() => {
     return () => {
-      // Revoke object URLs to prevent memory leaks
-      thumbnails.forEach(revoke);
+      thumbnailsRef.current.forEach(revoke);
     };
   }, []);
 

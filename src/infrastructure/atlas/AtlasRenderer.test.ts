@@ -51,10 +51,8 @@ describe('createAtlasCanvas', () => {
   });
 
   it('falls back to a DOM canvas', () => {
-    vi.stubGlobal(
-      'document',
-      { createElement: () => new FakeCanvas() }
-    );
+    vi.stubGlobal('OffscreenCanvas', undefined);
+    vi.stubGlobal('document', { createElement: () => new FakeCanvas() });
     expect(createAtlasCanvas(12, 6)).toBeInstanceOf(FakeCanvas);
   });
 });

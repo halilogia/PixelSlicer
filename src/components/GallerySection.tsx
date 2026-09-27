@@ -4,30 +4,37 @@
 import React, { useCallback, memo } from 'react';
 import type { Frame } from '../domain/FrameLogic';
 import { useFrameThumbnails } from '../hooks/useFrameThumbnails';
+import { useEditorSelector } from '../hooks/useEditorSelector';
 import FrameThumbnail from './FrameThumbnail';
 import { EditorViewModel } from '../presentation/EditorViewModel';
 import { exportSingleFrame, downloadBlob } from '../infrastructure/ExportService';
 
 interface GallerySectionProps {
-  image: HTMLImageElement | HTMLCanvasElement | null;
-  frames: Frame[];
-  isImageLoaded: boolean;
-  selectedFrameIndex: number | null;
   viewModel: EditorViewModel;
-  isManualMode?: boolean;
-  gridFrameCount?: number;
 }
 
-// Memoized gallery to prevent re-renders
-const GallerySection: React.FC<GallerySectionProps> = ({
-  image,
-  frames,
-  isImageLoaded,
-  selectedFrameIndex,
-  viewModel,
-  isManualMode = false,
-  gridFrameCount = 0,
-}) => {
+/**
+ * The gallery subscribes to the slices it needs instead of receiving them as
+ * props: a zoom, a selection or a marching ants tick in the parent no longer
+ * re-renders a thousand thumbnails.
+ */
+const GallerySection: React.FC<GallerySectionProps> = ({ viewModel }) => {
+  const image = useEditorSelector(viewModel, state => state.processedImage || state.image);
+  const isImageLoaded = useEditorSelector(viewModel, state => state.isImageLoaded);
+  const isManualMode = useEditorSelector(viewModel, state => state.isManualMode);
+  const gridFrameCount = useEditorSelector(viewModel, state => state.frames.length);
+  const selectedFrameIndex = useEditorSelector(viewModel, state =>
+    state.isManualMode
+      ? state.selectedManualFrameIndex >= 0
+        ? state.selectedManualFrameIndex
+        : null
+      : state.singlePreviewFrameIndex
+  );
+  // Inactive frames stay visible: the eye button is how they come back.
+  const frames = useEditorSelector(viewModel, state =>
+    state.isManualMode ? state.manualFrames : state.frames
+  );
+
   // Use cached thumbnails hook
   // Increased maxSize for better resolution match with preview
   const thumbnails = useFrameThumbnails(image, frames, {
@@ -64,15 +71,7 @@ const GallerySection: React.FC<GallerySectionProps> = ({
     }
   }, [image, isManualMode, gridFrameCount, viewModel]);
 
-  if (!isImageLoaded) {
-    return (
-      <div className="gallery" id="framesGallery">
-        <p className="gallery-empty">Henüz kare oluşturulmadı.</p>
-      </div>
-    );
-  }
-
-  if (frames.length === 0) {
+  if (!isImageLoaded || frames.length === 0) {
     return (
       <div className="gallery" id="framesGallery">
         <p className="gallery-empty">Henüz kare oluşturulmadı.</p>
@@ -99,32 +98,8 @@ const GallerySection: React.FC<GallerySectionProps> = ({
   );
 };
 
-// Deep comparison for props
-const areEqual = (prev: GallerySectionProps, next: GallerySectionProps): boolean => {
-  if (prev.image !== next.image) return false;
-  if (prev.isImageLoaded !== next.isImageLoaded) return false;
-  if (prev.selectedFrameIndex !== next.selectedFrameIndex) return false;
-  if (prev.frames.length !== next.frames.length) return false;
-  if (prev.viewModel !== next.viewModel) return false;
-  if (prev.isManualMode !== next.isManualMode) return false;
-  if (prev.gridFrameCount !== next.gridFrameCount) return false;
-  
-  // Compare frames deeply but efficiently
-  for (let i = 0; i < prev.frames.length; i++) {
-    const prevFrame = prev.frames[i];
-    const nextFrame = next.frames[i];
-    if (
-      prevFrame.x !== nextFrame.x ||
-      prevFrame.y !== nextFrame.y ||
-      prevFrame.w !== nextFrame.w ||
-      prevFrame.h !== nextFrame.h ||
-      prevFrame.isActive !== nextFrame.isActive
-    ) {
-      return false;
-    }
-  }
-  
-  return true;
-};
+// The component subscribes on its own, the parent only has to stay stable.
+export default memo(GallerySection);
 
-export default memo(GallerySection, areEqual);
+export type { GallerySectionProps };
+export type { Frame };

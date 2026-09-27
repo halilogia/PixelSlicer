@@ -1284,19 +1284,8 @@ function App() {
       </div>
 
       {/* Frame Gallery - Optimized with thumbnail caching */}
-      {/* When manual mode is active, show only manual frames; otherwise show grid frames */}
-      <GallerySection
-        image={state.processedImage || state.image}
-        frames={state.isManualMode ? state.manualFrames : state.frames}
-        isImageLoaded={state.isImageLoaded}
-        selectedFrameIndex={state.isManualMode
-          ? (state.selectedManualFrameIndex >= 0 ? state.selectedManualFrameIndex : null)
-          : state.singlePreviewFrameIndex
-        }
-        viewModel={viewModel}
-        isManualMode={state.isManualMode}
-        gridFrameCount={state.frames.length}
-      />
+      {/* The gallery subscribes to the state it needs on its own */}
+      <GallerySection viewModel={viewModel} />
 
       {/* Settings Modal */}
 
