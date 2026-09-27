@@ -20,8 +20,27 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/domain/**/*.ts', 'src/infrastructure/atlas/**/*.ts'],
-      exclude: ['src/**/*.test.ts'],
+      // Everything under src/ is measured: a module that is not covered is a
+      // module nobody is watching.
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.test.tsx',
+        'src/testUtils/**',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+        'src/types/**',
+      ],
+      // Per area floors: the pure logic must not silently rot, while the
+      // untested UI can only hold the line it is at today.
+      thresholds: {
+        'src/domain/**': { lines: 90, functions: 95, branches: 85, statements: 90 },
+        'src/infrastructure/atlas/**': { lines: 90, functions: 90, branches: 80, statements: 90 },
+        'src/infrastructure/ExportService.ts': { lines: 90 },
+        'src/infrastructure/ImageLoader.ts': { lines: 90 },
+        'src/presentation/EditorViewModel.ts': { lines: 90 },
+        'src/**': { lines: 26, functions: 82, branches: 80, statements: 26 },
+      },
     },
   },
 });

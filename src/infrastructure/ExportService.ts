@@ -37,8 +37,9 @@ export async function exportAsZip(
     const blob = await new Promise<Blob>((resolve) => {
       canvas.toBlob((b) => resolve(b!), 'image/png');
     });
-    
-    zip.file(`frame_${String(i + 1).padStart(4, '0')}.png`, blob);
+
+    // ArrayBuffer keeps JSZip on the same code path in the browser and in Node.
+    zip.file(`frame_${String(i + 1).padStart(4, '0')}.png`, await blob.arrayBuffer());
   }
   
   return zip.generateAsync({ type: 'blob' });

@@ -122,7 +122,9 @@ export class EditorViewModel {
   private initialFrameState: Frame | null = null;
 
   constructor() {
-    this.state = { ...DEFAULT_STATE };
+    // Fresh array instances: the defaults are shared module state and
+    // `addManualFrame` mutates the manual list in place.
+    this.state = { ...DEFAULT_STATE, frames: [], manualFrames: [] };
   }
 
   // State access

@@ -10,6 +10,7 @@ export class FakeContext {
   imageSmoothingEnabled = true;
   saved = 0;
   restored = 0;
+  lastImageData: ImageData | null = null;
 
   clearRect(...args: number[]): void {
     this.cleared.push({ args });
@@ -17,6 +18,10 @@ export class FakeContext {
 
   drawImage(_image: CanvasImageSource, ...args: number[]): void {
     this.calls.push({ args });
+  }
+
+  putImageData(data: ImageData, _x: number, _y: number): void {
+    this.lastImageData = data;
   }
 
   save(): void {
