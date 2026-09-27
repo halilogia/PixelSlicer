@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { EditorViewModel } from './presentation/EditorViewModel';
 import { exportAsZip, exportAsSpriteSheet, exportAsGif, downloadBlob } from './infrastructure/ExportService';
 import { decodeGif } from './infrastructure/GifService';
+import { loadImageFromFile, loadImagesFromFiles } from './infrastructure/ImageLoader';
 import type { GridConfig } from './domain/FrameLogic';
 import { PIVOT_MODE_LABELS, pivotFromPoint } from './domain/atlas/AtlasPivot';
 import { PIVOT_MODES, type PivotMode } from './domain/atlas/AtlasTypes';
@@ -211,7 +212,36 @@ function App() {
       currentX: state.drawCurrentX,
       currentY: state.drawCurrentY,
     } : null;
-    
+
+    // Canvas state changes are expensive: only touch a property when the value
+    // actually changes, otherwise every frame in the grid re-applies the same
+    // stroke/fill/font (hundreds of redundant state changes on big sheets).
+    const applied = { stroke: '', fill: '', font: '', width: 0 };
+    const useStroke = (value: string) => {
+      if (applied.stroke !== value) {
+        ctx.strokeStyle = value;
+        applied.stroke = value;
+      }
+    };
+    const useFill = (value: string) => {
+      if (applied.fill !== value) {
+        ctx.fillStyle = value;
+        applied.fill = value;
+      }
+    };
+    const useFont = (value: string) => {
+      if (applied.font !== value) {
+        ctx.font = value;
+        applied.font = value;
+      }
+    };
+    const useLineWidth = (value: number) => {
+      if (applied.width !== value) {
+        ctx.lineWidth = value;
+        applied.width = value;
+      }
+    };
+
     // Draw frames
     const allFrames = viewModel.getFrames();
     allFrames.forEach((frame, index) => {
@@ -232,12 +262,12 @@ function App() {
         
         if (drawW > 0 && drawH > 0) {
           // Semi-transparent overlay
-          ctx.fillStyle = 'rgba(122, 162, 247, 0.15)';
+          useFill('rgba(122, 162, 247, 0.15)');
           ctx.fillRect(drawX, drawY, drawW, drawH);
           
           // Marching ants border
-          ctx.strokeStyle = '#7aa2f7';
-          ctx.lineWidth = 2;
+          useStroke('#7aa2f7');
+          useLineWidth(2);
           ctx.setLineDash([6, 4]);
           ctx.lineDashOffset = -marchingAntsOffset;
           ctx.strokeRect(drawX, drawY, drawW, drawH);
@@ -245,7 +275,7 @@ function App() {
           ctx.lineDashOffset = 0;
           
           // Dynamic border trail - corners
-          ctx.fillStyle = '#7aa2f7';
+          useFill('#7aa2f7');
           const handleSize = 8;
           // Top-left
           ctx.fillRect(drawX - handleSize/2, drawY - handleSize/2, handleSize, handleSize);
@@ -258,8 +288,8 @@ function App() {
         }
       } else {
         // Frame border - active: blue, inactive: red
-        ctx.strokeStyle = isSelected ? '#bb9af7' : frame.isActive ? '#7aa2f7' : '#f43f5e';
-        ctx.lineWidth = isSelected ? 3 : frame.isActive ? 2 : 3;
+        useStroke(isSelected ? '#bb9af7' : frame.isActive ? '#7aa2f7' : '#f43f5e');
+        useLineWidth(isSelected ? 3 : frame.isActive ? 2 : 3);
         
         // Draw solid border
         ctx.strokeRect(frame.x, frame.y, frame.w, frame.h);
@@ -267,17 +297,17 @@ function App() {
         // Selected frame highlighting
         if (isSelected) {
           // Outer glow effect
-          ctx.strokeStyle = 'rgba(187, 154, 247, 0.4)';
-          ctx.lineWidth = 6;
+          useStroke('rgba(187, 154, 247, 0.4)');
+          useLineWidth(6);
           ctx.strokeRect(frame.x - 2, frame.y - 2, frame.w + 4, frame.h + 4);
           
           // Inner highlight
-          ctx.strokeStyle = '#bb9af7';
-          ctx.lineWidth = 2;
+          useStroke('#bb9af7');
+          useLineWidth(2);
           ctx.strokeRect(frame.x + 2, frame.y + 2, frame.w - 4, frame.h - 4);
           
           // Draw resize handles for selected frame
-          ctx.fillStyle = '#bb9af7';
+          useFill('#bb9af7');
           const handleSize = 10;
           // Top-left
           ctx.fillRect(frame.x - handleSize/2, frame.y - handleSize/2, handleSize, handleSize);
@@ -298,12 +328,12 @@ function App() {
           // Delete button background (circular)
           ctx.beginPath();
           ctx.arc(deleteBtnX + deleteBtnSize/2, deleteBtnY + deleteBtnSize/2, deleteBtnSize/2, 0, Math.PI * 2);
-          ctx.fillStyle = '#f43f5e';
+          useFill('#f43f5e');
           ctx.fill();
           
           // X mark
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2;
+          useStroke('#ffffff');
+          useLineWidth(2);
           ctx.beginPath();
           ctx.moveTo(deleteBtnX + 4, deleteBtnY + 4);
           ctx.lineTo(deleteBtnX + deleteBtnSize - 4, deleteBtnY + deleteBtnSize - 4);
@@ -314,8 +344,8 @@ function App() {
         
         // Draw X mark for inactive frames
         if (!frame.isActive) {
-          ctx.strokeStyle = '#f43f5e';
-          ctx.lineWidth = 2;
+          useStroke('#f43f5e');
+          useLineWidth(2);
           ctx.beginPath();
           ctx.moveTo(frame.x + 4, frame.y + 4);
           ctx.lineTo(frame.x + frame.w - 4, frame.y + frame.h - 4);
@@ -326,8 +356,8 @@ function App() {
         
         // Frame number for active frames
         if (frame.isActive) {
-          ctx.fillStyle = isSelected ? '#bb9af7' : '#7aa2f7';
-          ctx.font = isSelected ? 'bold 14px sans-serif' : '12px sans-serif';
+          useFill(isSelected ? '#bb9af7' : '#7aa2f7');
+          useFont(isSelected ? 'bold 14px sans-serif' : '12px sans-serif');
           ctx.fillText(String(frame.index + 1), frame.x + 4, frame.y + (isSelected ? 18 : 14));
         }
       }
@@ -338,8 +368,8 @@ function App() {
         const pivotY = frame.y + frame.pivot.y * frame.h;
         const arm = 8;
 
-        ctx.strokeStyle = '#e0af68';
-        ctx.lineWidth = 1.5;
+        useStroke('#e0af68');
+        useLineWidth(1.5);
         ctx.beginPath();
         ctx.moveTo(pivotX - arm, pivotY);
         ctx.lineTo(pivotX + arm, pivotY);
@@ -411,77 +441,65 @@ function App() {
 
     if (files.length === 1) {
       // Single image - work as before
-      const file = files[0];
-      const img = new Image();
-      img.onload = () => {
-        viewModel.setImage(img);
-      };
-      img.src = URL.createObjectURL(file);
-    } else {
-      // Multiple images - stitch them into a grid
-      const fileList = Array.from(files);
-      const images: HTMLImageElement[] = [];
-
-      // Load all images
-      await Promise.all(fileList.map(file => {
-        return new Promise<void>((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            images.push(img);
-            resolve();
-          };
-          img.src = URL.createObjectURL(file);
-        });
-      }));
-
-      if (images.length === 0) return;
-
-      // Grid calculation (max 8 columns)
-      const cols = Math.min(images.length, 8);
-      const rows = Math.ceil(images.length / cols);
-      
-      // Calculate layout: find max width and max height of any single frame
-      let maxFrameW = 0;
-      let maxFrameH = 0;
-      for (const img of images) {
-        maxFrameW = Math.max(maxFrameW, img.naturalWidth);
-        maxFrameH = Math.max(maxFrameH, img.naturalHeight);
+      try {
+        viewModel.setImage(await loadImageFromFile(files[0]));
+      } catch (error) {
+        console.error('Failed to load image:', error);
       }
-
-      // Create combined grid canvas
-      const canvas = document.createElement('canvas');
-      canvas.width = cols * maxFrameW;
-      canvas.height = rows * maxFrameH;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Draw images in grid
-      images.forEach((img, index) => {
-        const r = Math.floor(index / cols);
-        const c = index % cols;
-        const x = c * maxFrameW;
-        const y = r * maxFrameH;
-        
-        // Center image within its grid cell if smaller
-        const offsetX = (maxFrameW - img.naturalWidth) / 2;
-        const offsetY = (maxFrameH - img.naturalHeight) / 2;
-        
-        ctx.drawImage(img, x + offsetX, y + offsetY);
-      });
-
-      // Set as main image
-      const combinedImg = new Image();
-      combinedImg.onload = () => {
-        viewModel.setImage(combinedImg);
-        // Auto-set grid to matching columns and rows
-        viewModel.setGridConfig({
-          cols: cols,
-          rows: rows
-        });
-        viewModel.setSheetColumns(cols);
-      };
-      combinedImg.src = canvas.toDataURL();
+      return;
     }
+
+    // Multiple images - stitch them into a grid
+    const fileList = Array.from(files);
+    const images = await loadImagesFromFiles(fileList);
+
+    if (images.length === 0) return;
+
+    // Grid calculation (max 8 columns)
+    const cols = Math.min(images.length, 8);
+    const rows = Math.ceil(images.length / cols);
+
+    // Calculate layout: find max width and max height of any single frame
+    let maxFrameW = 0;
+    let maxFrameH = 0;
+    for (const img of images) {
+      maxFrameW = Math.max(maxFrameW, img.naturalWidth);
+      maxFrameH = Math.max(maxFrameH, img.naturalHeight);
+    }
+
+    // Create combined grid canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = cols * maxFrameW;
+    canvas.height = rows * maxFrameH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Draw images in grid
+    images.forEach((img, index) => {
+      const r = Math.floor(index / cols);
+      const c = index % cols;
+      const x = c * maxFrameW;
+      const y = r * maxFrameH;
+
+      // Center image within its grid cell if smaller
+      const offsetX = (maxFrameW - img.naturalWidth) / 2;
+      const offsetY = (maxFrameH - img.naturalHeight) / 2;
+
+      ctx.drawImage(img, x + offsetX, y + offsetY);
+    });
+
+    // Set as main image
+    const combinedImg = new Image();
+    combinedImg.onload = () => {
+      viewModel.setImage(combinedImg);
+      // Auto-set grid to matching columns and rows
+      viewModel.setGridConfig({
+        cols: cols,
+        rows: rows
+      });
+      viewModel.setSheetColumns(cols);
+    };
+    combinedImg.src = canvas.toDataURL();
   }, []);
 
   // Handle GIF upload
@@ -499,15 +517,11 @@ function App() {
       spriteCanvas.height = gifInfo.height;
       const sCtx = spriteCanvas.getContext('2d')!;
       
-      // Draw each frame to the sprite strip
-      for (let i = 0; i < numFrames; i++) {
-        const frameCanvas = document.createElement('canvas');
-        frameCanvas.width = gifInfo.width;
-        frameCanvas.height = gifInfo.height;
-        const fCtx = frameCanvas.getContext('2d')!;
-        fCtx.putImageData(gifInfo.frames[i].data, 0, 0);
-        sCtx.drawImage(frameCanvas, i * gifInfo.width, 0);
-      }
+      // Sprite strip: every frame is written straight onto the strip, no
+      // intermediate canvas per frame.
+      gifInfo.frames.forEach((frame, i) => {
+        sCtx.putImageData(frame.data, i * gifInfo.width, 0);
+      });
       
       // Create image from sprite strip
       const img = new Image();
@@ -1222,9 +1236,10 @@ function App() {
               e.preventDefault();
               const file = e.dataTransfer.files[0];
               if (file) {
-                const img = new Image();
-                img.onload = () => viewModel.setImage(img);
-                img.src = URL.createObjectURL(file);
+                loadImageFromFile(file).then(
+                  img => viewModel.setImage(img),
+                  error => console.error('Failed to load image:', error)
+                );
               }
             }}
           >

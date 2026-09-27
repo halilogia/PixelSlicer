@@ -105,7 +105,8 @@ const DEFAULT_STATE: EditorState = {
 export class EditorViewModel {
   private state: EditorState;
   private listeners: Set<StateListener> = new Set();
-  private animationInterval: number | null = null;
+  private animationFrameId: number | null = null;
+  private lastAnimationStep: number = 0;
   
   // Drawing/Resize/Drag state
   private _isDrawing = false;
@@ -324,26 +325,44 @@ export class EditorViewModel {
     this.notify();
   }
 
+  /**
+   * Play the animation with requestAnimationFrame instead of a timer, so the
+   * preview stays in sync with the display and stops burning CPU in background
+   * tabs. Frame timing is derived from the elapsed time, which keeps a dropped
+   * frame from shifting the whole animation.
+   */
   startAnimation(): void {
     this.stopAnimation();
-    
+
     const activeFrames = this.getActiveFrames();
     if (activeFrames.length === 0) return;
-    
+
     this.state.isPlaying = true;
-    
-    this.animationInterval = window.setInterval(() => {
-      this.state.currentFrame = (this.state.currentFrame + 1) % activeFrames.length;
-      this.notify();
-    }, 1000 / this.state.fps);
-    
+    this.lastAnimationStep = performance.now();
     this.notify();
+
+    const step = (now: number): void => {
+      if (!this.state.isPlaying) return;
+
+      const frameDuration = 1000 / this.state.fps;
+      const elapsed = now - this.lastAnimationStep;
+
+      if (elapsed >= frameDuration) {
+        this.lastAnimationStep = now - (elapsed % frameDuration);
+        this.state.currentFrame = (this.state.currentFrame + 1) % activeFrames.length;
+        this.notify();
+      }
+
+      this.animationFrameId = requestAnimationFrame(step);
+    };
+
+    this.animationFrameId = requestAnimationFrame(step);
   }
 
   stopAnimation(): void {
-    if (this.animationInterval !== null) {
-      clearInterval(this.animationInterval);
-      this.animationInterval = null;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
     this.state.isPlaying = false;
     this.notify();

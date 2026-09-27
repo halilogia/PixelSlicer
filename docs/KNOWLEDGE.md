@@ -47,4 +47,12 @@ Path alias'ları `tsconfig.json`, `vite.config.ts` ve `vitest.config.ts` içinde
 
 - Biten işler `ROADMAP.md`'den düşer, `CHANGELOG.md`'ye taşınır. ROADMAP yalnızca gelecek işi tutar.
 - `npm run lint && npm test && npm run build` yeşil olmadan push yapılmaz (deploy workflow aynı adımları CI'da çalıştırır).
-- Mimari değişikliklerde `ARCHITECTURE.md` güncellenir; `ARCHITECTURE_AUTO_GENERATED.md` elle düzenlenmez, tarama scripti yeniden üretir.
+- Mimari değişikliklerde `ARCHITECTURE.md` güncellenir; `ARCHITECTURE_AUTO_GENERATED.md` **elle düzenlenmez**, `npm run docs:arch` ile yeniden üretilir.
+- `package.json` sürümü ile atlas metadata'sındaki `ATLAS_APP_VERSION` elle birlikte güncellenir.
+
+## 7. Tarayıcı kaynak yönetimi
+
+- Object URL'ler `ImageLoader` üzerinden alınır: yükleme bittikten **ve** hata durumunda `revokeObjectURL` çağrılır. `URL.createObjectURL` doğrudan çağrılmaz.
+- Canvas bağlam durumu (stroke/fill/font/lineWidth) döngü içinde yalnızca değer değiştiğinde atanır; aynı değeri tekrar atamak pahalıdır.
+- Worker'dan dönen `ImageBitmap`'ler iş bitince `close()` ile serbest bırakılır.
+- Uzun süreli döngüler `setInterval` değil `requestAnimationFrame` kullanır; kalan süre hesaba katılır, kare atlarken kayma olmaz.

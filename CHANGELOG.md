@@ -2,6 +2,23 @@
 
 All notable changes to the PixelSlicer project will be documented in this file.
 
+## [2.2.0] - 2026-09-27
+### Fixed
+- **Object URL leak** (`F-002`): image upload, multi image stitching and the drag & drop path never revoked their object URLs. A new `ImageLoader` service revokes as soon as the browser finished decoding, and also when decoding fails.
+- **Broken upload no longer hangs** (`F-002`): the multi image branch awaited a promise that was never rejected when a file could not be decoded, so a single corrupt file blocked the whole batch. It now skips unreadable files.
+- **Animation playback** (`F-009`): `setInterval` replaced with a `requestAnimationFrame` loop. The preview now stays in sync with the display rate, stops burning CPU in background tabs, and carries the frame remainder over instead of drifting when a frame is dropped.
+- **GIF import** (`F-005`): the sprite strip is written with one `putImageData` per frame, removing one intermediate canvas per GIF frame.
+- **Canvas state churn** (`F-008`): the main canvas draw only touches `strokeStyle` / `fillStyle` / `font` / `lineWidth` when the value actually changes, which removes hundreds of redundant state changes on large sheets.
+
+### Added
+- `ImageLoader` infrastructure service (`loadImageFromUrl`, `loadImageFromFile`, `loadImagesFromFiles`).
+- Test suites for the new code: object URL lifecycle, and the animation loop driven through a deterministic `requestAnimationFrame` clock (7 + 6 tests).
+- `npm run docs:arch` regenerates `ARCHITECTURE_AUTO_GENERATED.md` from the real source tree, so the scan can no longer drift behind the code.
+
+### Changed
+- Package version bumped to 2.2.0; the version written into Phaser/Godot/Unity atlas metadata follows it.
+- `docs/OPTIMIZATIONS.md` status table refreshed: `F-002`, `F-005`, `F-008` and `F-009` are now closed.
+
 ## [2.1.0] - 2026-09-27
 ### Added
 - **Texture Atlas Packer**: MaxRects (BSSF) packing into power-of-two, multi-page atlases with per-sprite padding and extrude rings so no two sprites can touch or bleed.

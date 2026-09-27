@@ -2,14 +2,6 @@
 
 > Only **future** work lives here. Everything already shipped is recorded in [CHANGELOG.md](CHANGELOG.md).
 
-## 🎯 v2.2 — Correctness & Quick Performance Wins
-
-- [ ] **Fix the object URL leak** (`F-002`): `handleImageUpload`, the drag & drop handler and `handleGifUpload` never call `URL.revokeObjectURL`. ~15 min, no risk.
-- [ ] **RAF based animation playback** (`F-009`): replace the `setInterval` in `EditorViewModel.startAnimation` with a `requestAnimationFrame` loop so the preview stays in sync and stops burning CPU in background tabs.
-- [ ] **Build the GIF sprite strip without intermediate canvases** (`F-005`): a single `putImageData` pass per frame onto the strip canvas.
-- [ ] **Batch canvas state changes** (`F-008`): hoist `ctx.font` / `ctx.fillStyle` out of the per-frame loop of the main canvas draw.
-- [ ] **Regenerate `ARCHITECTURE_AUTO_GENERATED.md`**: the auto-generated scan is two releases behind and does not know about `src/domain/atlas`, `src/infrastructure/atlas`, `src/workers` or `src/testUtils`.
-
 ## ⚡ v2.3 — Large Sheet Performance
 
 - [ ] **Selector based ViewModel subscriptions** (`F-003`): today every state change re-renders the whole tree, which is the main cost at 500+ frames.

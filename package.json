@@ -1,7 +1,7 @@
 {
   "name": "pixelslicer",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.2.0",
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {
@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "docs:arch": "node scripts/generate-architecture-report.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.34.4",

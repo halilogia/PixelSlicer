@@ -786,23 +786,26 @@ const handleGifUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement
 Aşağıda rapordaki optimizasyonların **mevcut kodda** uygulanma durumu yer alır.
 Raporun gövdesi 2026-02-28 tarihli denetimdir ve değiştirilmemiştir; canlı kısım bu bölümdür.
 
-**Son kontrol: 2026-09-27** (PixelSlicer v2.1.0)
+**Son kontrol: 2026-09-27** (PixelSlicer v2.2.0)
 
 ### ✅ Tamamlanan
 
 | ID | Optimizasyon | Durum |
 |----|--------------|-------|
 | **F-001** | Frame Gallery Canvas Oluşturma | `useFrameThumbnails` thumbnail'leri idle callback ile toplu üretiyor ve önbelleğe alıyor; `GallerySection` / `FrameThumbnail` ile memoize edildi |
+| **F-002** | URL.createObjectURL Leak | `ImageLoader` (`src/infrastructure/ImageLoader.ts`) yükleme sonrası *ve* hata halinde revoke ediyor; upload, toplu stitching ve sürükle-bırak yolları bu servisi kullanıyor. Bozuk dosyada takılmayan `Promise.allSettled` tabanlı batch eklendi |
+| **F-005** | GIF Frame Canvas'ları | Şerit doğrudan `putImageData` ile yazılıyor, kare başına ara canvas yok |
+| **F-008** | Canvas Font Batching | Ana canvas çiziminde `strokeStyle` / `fillStyle` / `font` / `lineWidth` yalnızca değer değiştiğinde atanıyor (v2.2.0) |
+| **F-009** | RAF Animation | `EditorViewModel.startAnimation` artık `requestAnimationFrame` kullanıyor; kalan süre devretiliyor, kare atlarken kayma olmuyor |
 | **F-010** | Sprite Sheet Hesaplama Hatası | Düzeltildi: `ExportService.ts:71` artık `frame.x + frame.w` değil `frame.w` kullanıyor (eski durum tablosu hatalıydı) |
 
 ### ⚠️ Kısmen Tamamlanan
 
 | ID | Optimizasyon | Durum | Not |
 |----|--------------|-------|-----|
-| **F-002** | URL.createObjectURL Leak | Kısmen | Hook'lar, video servisleri ve `downloadBlob` temizlik yapıyor; `App.tsx` içindeki `handleImageUpload`, GIF handler ve sürükle-bırak yolu hâlâ `revokeObjectURL` çağırmıyor |
 | **F-004** | Canvas Context Cache | Kısmen | Gerçek bir pool yok; atlas pipeline sayfa başına tek canvas kullanıyor ve worker'da `OffscreenCanvas` tercih ediyor, ana iş parçacığı yolunda DOM canvas'a düşüyor |
-| **4.2 / 4.4** | Web Worker + OffscreenCanvas | Kısmen | Atlas trim/paket/raster işi worker'da (`src/workers/atlasWorker.ts`), ana iş parçacığı fallback'i test ediliyor. Thumbnail üretimi, GIF decode ve ZIP/GIF export hâlâ ana iş parçacığında |
-| **4.5** | createImageBitmap | Kısmen | `AtlasWorkerClient` bitmap göndermeden önce `createImageBitmap` kullanıyor; editör yükleme yolu hâlâ `HTMLImageElement` |
+| **4.2 / 4.4** | Web Worker + OffscreenCanvas | Kısmen | Atlas trim/paket/raster işi worker'da (`src/workers/atlasWorker.ts`), ana iş parçacığı fallback'i test ediliyor. Thumbnail üretimi ve ZIP/GIF export hâlâ ana iş parçacığında |
+| **4.5** | createImageBitmap | Kısmen | `AtlasWorkerClient` bitmap'i `createImageBitmap` ile alıyor; editör yükleme yolu hâlâ `HTMLImageElement` (artık kısa ömürlü object URL ile) |
 | **F-006** | UseEffect Dependency Bloat | Kısmen | Ana canvas efektinin dependency sayısı arttı (12); görsel-only değişiklikler hâlâ tam yeniden çizim tetikliyor |
 
 ### ❌ Yapılmayanlar
@@ -810,19 +813,17 @@ Raporun gövdesi 2026-02-28 tarihli denetimdir ve değiştirilmemiştir; canlı 
 | ID | Optimizasyon | Durum |
 |----|--------------|-------|
 | **F-003** | Selector Based Subscription | Yok; `EditorViewModel` hâlâ her değişiklikte tüm state'i yeni nesne olarak yayınlıyor |
-| **F-005** | GIF Frame Canvas'ları | Yok; `handleGifUpload` her kare için ara canvas oluşturuyor |
 | **F-007** | ViewModel Array Spread | Yok; `getFrames()` / `getActiveFrames()` her çağrıda yeni dizi üretiyor |
-| **F-008** | Canvas Font Batching | Yok; `ctx.font` / `ctx.fillStyle` kare döngüsünün içinde |
-| **F-009** | RAF Animation | Yok; `EditorViewModel.startAnimation` `setInterval` kullanıyor |
 | **4.1** | Gallery Virtualization | Yok |
 | **4.3** | State Management Refactor | Yok; ROADMAP v2.3'e taşındı |
 
 ### Özet
 
-- **Tamamlanan:** 2/10 bulgu + 4/5 derin optimizasyon kısmen
-- **Kısmen:** 5/10
-- **Yapılmayan:** 5/10
+- **Tamamlanan:** 6/10 bulgu
+- **Kısmen:** 4/10
+- **Yapılmayan:** 3/10 (F-003, F-007, 4.1, 4.3 — hepsi ROADMAP v2.3)
 
-**Öncelikli düzeltmeler:** F-002 (memory leak) → F-009 (animasyon) → F-003 + F-007 (büyük sheet performansı, ROADMAP v2.3)
+**Sıradaki düzeltmeler:** F-003 + F-007 (büyük sheet performansı) → 4.1 (galeri sanallaştırma) → 4.2'nin kalan kısmı (thumbnail ve export'u worker'a taşı)
 
-> 🛡️ Bu artık Vitest ile korunuyor: 100 test (trim, pivot, packer, layout, renderer geometrisi, worker protokolü, exporter çıktıları). Yeni test runner sayesinde bu düzeltmelerden biri regresyon yaratırsa CI yakalar.
+> 🛡️ Artık Vitest ile korunuyor: 113 test (trim, pivot, packer, layout, renderer geometrisi, worker protokolü, exporter çıktıları, object URL yaşam döngüsü, animasyon döngüsü).
+
