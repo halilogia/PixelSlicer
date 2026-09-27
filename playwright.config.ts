@@ -21,6 +21,27 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /mobile\.spec\.ts/,
+    },
+    {
+      // The atlas and the export paths use OffscreenCanvas, which the three
+      // engines implement differently: this is where the browser differences
+      // surface.
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+      testIgnore: /mobile\.spec\.ts/,
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+      testIgnore: /mobile\.spec\.ts/,
+    },
+    {
+      // A phone viewport: the sidebar has to stay usable and taps have to
+      // reach the controls.
+      name: 'mobile',
+      use: { ...devices['iPhone 13'] },
+      testMatch: /mobile\.spec\.ts/,
     },
   ],
   webServer: {

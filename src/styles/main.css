@@ -12,10 +12,12 @@
   --border-default: #414868;
   --border-focus: #7aa2f7;
 
-  /* Text */
-  --text-primary: #a9b1d6;
-  --text-secondary: #565f89;
-  --text-muted: #414868;
+  /* Text
+     Secondary and muted are tuned for WCAG AA (4.5:1) against both the page
+     and the raised surfaces; the old values failed at 2.2-2.9:1. */
+  --text-primary: #c0caf5;
+  --text-secondary: #9aa5ce;
+  --text-muted: #7a84a8;
   --text-white: #ffffff;
 
   /* Accents */
@@ -189,9 +191,10 @@ body {
   min-height: 36px;
 }
 
+/* Accent backgrounds take dark text: white on the light accents was 2.5:1. */
 .btn--primary {
   background-color: var(--accent-blue);
-  color: var(--text-white);
+  color: var(--bg-primary);
 }
 
 .btn--primary:hover {

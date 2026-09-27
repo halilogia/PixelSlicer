@@ -213,8 +213,8 @@ export function AtlasExporterModal({
           <h3 className="modal__title">
             <i className="fa-solid fa-cubes"></i> {t('atlasPacker')}
           </h3>
-          <button className="modal__close" onClick={onClose}>
-            <i className="fa-solid fa-xmark"></i>
+          <button className="modal__close" onClick={onClose} aria-label={t('close')}>
+            <i className="fa-solid fa-xmark" aria-hidden="true"></i>
           </button>
         </div>
 
@@ -245,6 +245,7 @@ export function AtlasExporterModal({
                   </div>
                   <input
                     type="range"
+                    aria-label={t('atlasAlphaThreshold')}
                     min={0}
                     max={255}
                     value={alphaThreshold}
@@ -260,6 +261,7 @@ export function AtlasExporterModal({
                 </div>
                 <input
                   type="range"
+                  aria-label={t('atlasPadding')}
                   min={0}
                   max={16}
                   value={padding}
@@ -274,6 +276,7 @@ export function AtlasExporterModal({
                 </div>
                 <input
                   type="range"
+                  aria-label={t('atlasExtrude')}
                   min={0}
                   max={8}
                   value={extrude}
@@ -321,6 +324,7 @@ export function AtlasExporterModal({
                   </span>
                 </div>
                 <input
+                  aria-label={t('atlasFramesPerGroup')}
                   type="range"
                   min={0}
                   max={16}
@@ -338,6 +342,7 @@ export function AtlasExporterModal({
                     type="text"
                     className="form-input"
                     value={namePrefix}
+                    aria-label={t('atlasNaming')}
                     onChange={event => {
                       setNamePrefix(event.target.value);
                       setRenames({});
@@ -347,7 +352,7 @@ export function AtlasExporterModal({
                   />
                   <input
                     type="number"
-                    className="form-input atlas__number"
+                    aria-label={t('atlasNaming')}
                     value={nameStartIndex}
                     min={0}
                     onChange={event => setNameStartIndex(Math.max(0, parseInt(event.target.value) || 0))}
@@ -391,6 +396,7 @@ export function AtlasExporterModal({
                   <label className="form-label">{t('atlasAnimationName')}</label>
                   <input
                     type="text"
+                    aria-label={t('atlasAnimationName')}
                     className="form-input"
                     value={animationName}
                     onChange={event => setAnimationName(event.target.value)}

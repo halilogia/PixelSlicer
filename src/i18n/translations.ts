@@ -152,6 +152,8 @@ export const translations = {
     inactive: 'Pasif',
     zoomIn: 'Büyüt',
     zoomOut: 'Küçült',
+    play: 'Oynat',
+    pause: 'Duraklat',
     fitScreen: 'Ekrana Sığdır',
   },
 
@@ -304,6 +306,8 @@ export const translations = {
     inactive: 'Inactive',
     zoomIn: 'Zoom In',
     zoomOut: 'Zoom Out',
+    play: 'Play',
+    pause: 'Pause',
     fitScreen: 'Fit to Screen',
   },
 } as const;

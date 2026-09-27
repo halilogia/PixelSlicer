@@ -2,6 +2,29 @@
 
 All notable changes to the PixelSlicer project will be documented in this file.
 
+## [2.6.0] - 2026-09-27
+
+### Added
+- **Deterministic ZIP output**: `encodeFramesAsZip` accepts a `modifiedAt` timestamp, so the archive is byte for byte reproducible when a test pins it. The editor still stamps the real export time.
+- **Golden archive tests**: the whole ZIP is now checksummed, not just its size, and a test proves a pixel change changes the archive.
+- **Video sprite sheet builder tests**: `createSpriteSheetFromFrames` covers the grid, the canvas fallback, the per frame canvas size and the cleanup.
+- **Upload simulation tests**: `uploadVideo` progress, `cancelAllUploads` and `cancelUpload` run on a controlled clock with a fake `<video>` element.
+- **`VideoPreview` component tests**: thumbnail, placeholder fallback, duration and size formatting, remove by id, accessible button names.
+- **Accessibility sweep** (`e2e/accessibility.spec.ts`): axe-core runs against the empty editor, the loaded editor and the atlas modal, on the WCAG 2.1 A/AA tags.
+- **Phone viewport suite** (`e2e/mobile.spec.ts`, iPhone 13 profile): no horizontal overflow, canvas/sidebar/gallery visible, taps on manual mode, the atlas packer and the zoom controls.
+
+### Fixed
+The accessibility audit found four real defects, all fixed:
+- **Contrast**: `--text-secondary` and `--text-muted` failed WCAG AA at 2.2-2.9:1 on both the page and the raised surfaces; they are now `#9aa5ce` / `#7a84a8` (5.5-6.5:1), and the primary button takes dark text on the light accent instead of white (2.5:1).
+- **Unlabelled controls**: the grid, offset, padding, FPS, tolerance, alpha and sheet column inputs, plus the pivot `<select>`, had no accessible name. All of them carry one now.
+- **Icon only buttons** with no accessible name: settings, video, the four preview controls and the modal close buttons.
+- The decorative FontAwesome icons are now `aria-hidden`, so they no longer leak into the accessible name.
+
+### Changed
+- Coverage 68% → **71.6%** line coverage, 366 → **382** unit/component tests, 18 → **32** browser scenarios (Chromium, Firefox, WebKit, plus the phone profile). Floors moved to 70% lines / 70% functions / 85% branches.
+- `docs/KNOWLEDGE.md` documents the axe rule: every icon only control needs an accessible name, and the palette has to clear AA.
+- `ROADMAP.md` drops the finished test depth section.
+
 ## [2.5.0] - 2026-09-27
 
 ### Added

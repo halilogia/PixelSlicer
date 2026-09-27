@@ -15,6 +15,12 @@ export type FrameReader = (frame: Frame, index: number) => ImageData;
 
 export interface ZipOptions {
   activeOnly?: boolean;
+  /**
+   * Timestamp written into every entry. Left out in the editor (a real archive
+   * carries the export time) but pinned in the golden tests, because JSZip
+   * stamps the current time and the bytes would change on every run.
+   */
+  modifiedAt?: Date;
 }
 
 export function selectFrames(frames: readonly Frame[], activeOnly: boolean): Frame[] {
@@ -127,7 +133,8 @@ export async function encodeFramesAsZip(
   for (let i = 0; i < selected.length; i++) {
     // ArrayBuffer keeps JSZip on the same code path in the browser and in Node.
     const blob = await encodeFrame(selected[i], i);
-    zip.file(frameFileName(i), await blob.arrayBuffer());
+    const entry: { date?: Date } = options.modifiedAt ? { date: options.modifiedAt } : {};
+    zip.file(frameFileName(i), await blob.arrayBuffer(), entry);
   }
 
   return zip.generateAsync({ type: 'blob' });

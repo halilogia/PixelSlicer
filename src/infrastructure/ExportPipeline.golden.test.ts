@@ -202,23 +202,72 @@ describe('golden descriptor output', () => {
   });
 });
 
-describe('golden ZIP structure', () => {
-  it('names the entries in frame order and is byte stable', async () => {
+describe('golden ZIP output', () => {
+  const pinnedDate = new Date(Date.UTC(2026, 0, 1, 0, 0, 0));
+
+  it('is byte stable when the timestamp is pinned', async () => {
     const { data, width, height } = sheet();
     const buffer = { width, height, data };
     const encoder = async (selected: typeof frames[number]) =>
       new Blob([new Uint8Array(cropFrame(buffer, selected).data)]);
 
-    const first = new Uint8Array(
+    const build = async (): Promise<Uint8Array> =>
+      new Uint8Array(
+        await (
+          await encodeFramesAsZip(frames, encoder, { activeOnly: true, modifiedAt: pinnedDate })
+        ).arrayBuffer()
+      );
+
+    const first = await build();
+    const second = await build();
+
+    // The whole archive is reproducible now, not just its size.
+    expect(checksum(second)).toBe(checksum(first));
+    expect(first.length).toBeGreaterThan(0);
+  });
+
+  it('changes when a pixel changes', async () => {
+    const { data, width, height } = sheet();
+    const buffer = { width, height, data: data.slice() };
+    const encoder = async (selected: typeof frames[number]) =>
+      new Blob([new Uint8Array(cropFrame(buffer, selected).data)]);
+
+    const build = async (): Promise<string> =>
+      checksum(
+        new Uint8Array(
+          await (
+            await encodeFramesAsZip(frames, encoder, { activeOnly: true, modifiedAt: pinnedDate })
+          ).arrayBuffer()
+        )
+      );
+
+    const before = await build();
+    const offset = ((0 * FIXTURE_CELL + 16) * width + (1 * FIXTURE_CELL + 16)) * 4;
+    buffer.data[offset] = 200;
+    const after = await build();
+
+    expect(after).not.toBe(before);
+  });
+
+  it('changes when the entry timestamp is not pinned', async () => {
+    const { data, width, height } = sheet();
+    const buffer = { width, height, data };
+    const encoder = async (selected: typeof frames[number]) =>
+      new Blob([new Uint8Array(cropFrame(buffer, selected).data)]);
+
+    const a = new Uint8Array(
       await (await encodeFramesAsZip(frames, encoder, { activeOnly: true })).arrayBuffer()
     );
-    const second = new Uint8Array(
-      await (await encodeFramesAsZip(frames, encoder, { activeOnly: true })).arrayBuffer()
+    const b = new Uint8Array(
+      await (
+        await encodeFramesAsZip(frames, encoder, {
+          activeOnly: true,
+          modifiedAt: new Date(Date.now() + 5000),
+        })
+      ).arrayBuffer()
     );
 
-    // JSZip stores timestamps, so the archive bytes are compared as a size and
-    // the entry list is asserted separately.
-    expect(second.length).toBe(first.length);
-    expect(first.length).toBeGreaterThan(0);
+    // Without a pinned date the archive carries the export time.
+    expect(checksum(b)).not.toBe(checksum(a));
   });
 });

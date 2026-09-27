@@ -835,26 +835,27 @@ function App() {
         </div>
         <div className="header__actions">
           <label className="btn btn--success">
-            <i className="fa-solid fa-film"></i> {t('uploadGif')}
+            <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('uploadGif')}
             <input type="file" accept="image/gif" className="file-input" onChange={handleGifUpload} />
           </label>
           <label className="btn btn--primary">
-            <i className="fa-solid fa-upload"></i> {t('uploadImage')}
+            <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('uploadImage')}
             <input type="file" accept="image/*" className="file-input" data-testid="image-upload-input" onChange={handleImageUpload} multiple />
           </label>
           <button
             className="btn btn--secondary settings-btn"
+              aria-label={t('settings')}
             onClick={() => setShowSettings(true)}
             title={t('settings')}
           >
-            <i className="fa-solid fa-gear"></i>
+            <i className="fa-solid fa-gear" aria-hidden="true"></i>
           </button>
           <button
             className={`btn ${showVideoUploader ? 'btn--active' : 'btn--secondary'}`}
             onClick={() => setShowVideoUploader(!showVideoUploader)}
             title={t('uploadVideos')}
           >
-            <i className="fa-solid fa-video"></i>
+            <i className="fa-solid fa-video" aria-hidden="true"></i>
           </button>
         </div>
       </header>
@@ -865,7 +866,7 @@ function App() {
           {/* Manual Mode */}
           <div className="sidebar__section">
             <h3 className="sidebar__title">
-              <i className="fa-solid fa-pen-nib"></i> {t('manualSelection')}
+              <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('manualSelection')}
             </h3>
             <button
               className={`btn ${state.isManualMode ? 'btn--active' : 'btn--secondary'}`}
@@ -897,7 +898,7 @@ function App() {
                 <div className="number-input-wrapper">
                   <input
                     type="number"
-                    className="form-input"
+                    className="form-input" aria-label={t('columns')}
                     value={state.gridConfig.cols}
                     min={1}
                     onChange={(e) => handleGridChange('cols', parseInt(e.target.value) || 1)}
@@ -913,7 +914,7 @@ function App() {
                 <div className="number-input-wrapper">
                   <input
                     type="number"
-                    className="form-input"
+                    className="form-input" aria-label={t('rows')}
                     value={state.gridConfig.rows}
                     min={1}
                     onChange={(e) => handleGridChange('rows', parseInt(e.target.value) || 1)}
@@ -937,7 +938,7 @@ function App() {
                   style={{ padding: '4px 8px', fontSize: '10px' }}
                   onClick={() => viewModel.resetFineTune()}
                 >
-                  <i className="fa-solid fa-rotate-left"></i> {t('reset')}
+                  <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('reset')}
                 </button>
               </div>
 
@@ -948,7 +949,7 @@ function App() {
                 </div>
                 <input
                   type="range"
-                  min={-100}
+                  min={-100} aria-label={t('offsetX')}
                   max={100}
                   value={state.gridConfig.offsetX}
                   onChange={(e) => handleGridChange('offsetX', parseInt(e.target.value))}
@@ -962,7 +963,7 @@ function App() {
                 </div>
                 <input
                   type="range"
-                  min={-100}
+                  min={-100} aria-label={t('offsetY')}
                   max={100}
                   value={state.gridConfig.offsetY}
                   onChange={(e) => handleGridChange('offsetY', parseInt(e.target.value))}
@@ -976,7 +977,7 @@ function App() {
                 </div>
                 <input
                   type="range"
-                  min={-50}
+                  min={-50} aria-label={t('padding')}
                   max={50}
                   value={state.gridConfig.padding}
                   onChange={(e) => handleGridChange('padding', parseInt(e.target.value))}
@@ -999,15 +1000,15 @@ function App() {
               )}
             </div>
             <div className="preview-controls">
-              <button className="btn btn--secondary" style={{ padding: '4px 8px' }} onClick={() => {
+              <button className="btn btn--secondary" style={{ padding: '4px 8px' }} aria-label={t('zoomOut')} onClick={() => {
                 const newZoom = state.previewZoom === -1 ? 0.5 : Math.max(0.1, state.previewZoom - 0.1);
                 viewModel.setPreviewZoom(newZoom);
               }}>
-                <i className="fa-solid fa-minus"></i>
+                <i className="fa-solid fa-minus" aria-hidden="true"></i>
               </button>
               <button
+                aria-label={state.isPlaying ? t('pause') : t('play')}
                 className="btn btn--secondary"
-                style={{ padding: '4px 8px' }}
                 onClick={() => {
                   if (state.isPlaying) {
                     viewModel.stopAnimation();
@@ -1017,13 +1018,13 @@ function App() {
                   }
                 }}
               >
-                <i className={`fa-solid ${state.isPlaying ? 'fa-pause' : 'fa-play'}`}></i>
+                <i className={`fa-solid ${state.isPlaying ? 'fa-pause' : 'fa-play'}`} aria-hidden="true"></i>
               </button>
-              <button className="btn btn--secondary" style={{ padding: '4px 8px' }} onClick={() => {
+              <button className="btn btn--secondary" style={{ padding: '4px 8px' }} aria-label={t('zoomIn')} onClick={() => {
                 const newZoom = state.previewZoom === -1 ? 0.5 : state.previewZoom + 0.1;
                 viewModel.setPreviewZoom(newZoom);
               }}>
-                <i className="fa-solid fa-plus"></i>
+                <i className="fa-solid fa-plus" aria-hidden="true"></i>
               </button>
               <button className="btn btn--secondary" style={{ padding: '4px 8px' }} onClick={() => viewModel.setPreviewZoom(-1)}>
                 {t('fit')}
@@ -1033,7 +1034,7 @@ function App() {
               <label className="form-label">{t('speed')}</label>
               <input
                 type="range"
-                min={1}
+                min={1} aria-label={t('speed')}
                 max={60}
                 value={state.fps}
                 onChange={(e) => viewModel.setFps(parseInt(e.target.value))}
@@ -1109,7 +1110,7 @@ function App() {
                   </div>
                   <input
                     type="range"
-                    min={0}
+                    min={0} aria-label={t('tolerance')}
                     max={255}
                     value={state.removeBgColor.tolerance}
                     onChange={(e) => viewModel.setRemoveBgColor(state.removeBgColor.r, state.removeBgColor.g, state.removeBgColor.b, parseInt(e.target.value))}
@@ -1129,7 +1130,7 @@ function App() {
             <div className="form-group">
               <label className="form-label">{t('pivotMode')}</label>
               <select
-                className="form-input"
+                className="form-input" aria-label={t('pivotMode')}
                 value={state.pivotMode}
                 onChange={(e) => viewModel.setPivotMode(e.target.value as PivotMode)}
               >
@@ -1148,7 +1149,7 @@ function App() {
               onClick={() => viewModel.togglePivotPicking()}
               title={t('pivotPickHint')}
             >
-              <i className="fa-solid fa-crosshairs"></i>{' '}
+              <i className="fa-solid fa-pen-nib" aria-hidden="true"></i>{' '}
               {state.isPivotPicking ? t('pivotPickingOn') : t('pivotPick')}
             </button>
 
@@ -1158,7 +1159,7 @@ function App() {
                 style={{ width: '100%', marginTop: '8px' }}
                 onClick={() => viewModel.clearFramePivots()}
               >
-                <i className="fa-solid fa-rotate-left"></i> {t('pivotClear')} (
+                <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('pivotClear')} (
                 {viewModel.getPickedPivotCount()})
               </button>
             )}
@@ -1183,7 +1184,7 @@ function App() {
                 </div>
                 <input
                   type="range"
-                  min={0}
+                  min={0} aria-label={t('atlasAlphaThreshold')}
                   max={255}
                   value={state.atlasAlphaThreshold}
                   onChange={(e) => viewModel.setAtlasAlphaThreshold(parseInt(e.target.value))}
@@ -1198,7 +1199,7 @@ function App() {
               disabled={!state.image}
               data-testid="atlas-open"
             >
-              <i className="fa-solid fa-layer-group"></i> {t('atlasOpen')}
+              <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('atlasOpen')}
             </button>
           </div>
 
@@ -1209,6 +1210,7 @@ function App() {
               <div className="number-input-wrapper">
                 <input
                   type="number"
+                  aria-label={t('sheetColumns')}
                   className="form-input"
                   value={state.sheetColumns}
                   min={1}
@@ -1234,7 +1236,7 @@ function App() {
               onClick={handleExportGif}
               disabled={!state.image}
             >
-              <i className="fa-solid fa-film"></i> {t('downloadGif')}
+              <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('downloadGif')}
             </button>
             <button
               className="btn btn--secondary"
@@ -1242,7 +1244,7 @@ function App() {
               onClick={handleExportZip}
               disabled={!state.image}
             >
-              <i className="fa-solid fa-file-zipper"></i> {t('downloadZip')}
+              <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('downloadZip')}
             </button>
           </div>
         </aside>
@@ -1251,12 +1253,12 @@ function App() {
         <main className="canvas-area">
           {/* Zoom Controls */}
           <div className="zoom-controls">
-            <button className="zoom-btn" onClick={() => viewModel.zoomOut()} title={t('zoomOut')}>
-              <i className="fa-solid fa-minus"></i>
+            <button className="zoom-btn" onClick={() => viewModel.zoomOut()} title={t('zoomOut')} aria-label={t('zoomOut')}>
+              <i className="fa-solid fa-minus" aria-hidden="true"></i>
             </button>
             <span className="zoom-level">{Math.round(state.zoom * 100)}%</span>
-            <button className="zoom-btn" onClick={() => viewModel.zoomIn()} title={t('zoomIn')}>
-              <i className="fa-solid fa-plus"></i>
+            <button className="zoom-btn" onClick={() => viewModel.zoomIn()} title={t('zoomIn')} aria-label={t('zoomIn')}>
+              <i className="fa-solid fa-plus" aria-hidden="true"></i>
             </button>
             <div className="zoom-divider"></div>
             <button className="zoom-btn zoom-btn--text" onClick={() => viewModel.setZoom(1)} title={t('fitScreen')}>
@@ -1335,9 +1337,9 @@ function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal__header">
               <h3 className="modal__title">
-                <i className="fa-solid fa-gear"></i> {t('settings')}
+                <i className="fa-solid fa-pen-nib" aria-hidden="true"></i> {t('settings')}
               </h3>
-              <button className="modal__close" onClick={() => setShowSettings(false)}>
+              <button className="modal__close" onClick={() => setShowSettings(false)} aria-label={t('close')}>
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -1373,7 +1375,7 @@ function App() {
               <h3 className="modal__title">
                 <i className="fa-solid fa-video"></i> {t('uploadVideos')}
               </h3>
-              <button className="modal__close" onClick={() => setShowVideoUploader(false)}>
+              <button className="modal__close" onClick={() => setShowVideoUploader(false)} aria-label={t('close')}>
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
