@@ -42,7 +42,7 @@ export default defineConfig({
         'src/infrastructure/ExportService.ts': { lines: 90 },
         'src/infrastructure/ImageLoader.ts': { lines: 90 },
         'src/presentation/EditorViewModel.ts': { lines: 90 },
-        'src/**': { lines: 26, functions: 82, branches: 80, statements: 26 },
+        'src/**': { lines: 34, functions: 85, branches: 85, statements: 34 },
       },
     },
   },

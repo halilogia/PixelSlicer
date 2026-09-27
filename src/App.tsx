@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { EditorViewModel } from './presentation/EditorViewModel';
-import { exportAsZip, exportAsSpriteSheet, exportAsGif, downloadBlob } from './infrastructure/ExportService';
+import { exportAsSpriteSheet, downloadBlob, readSourceBuffer } from './infrastructure/ExportService';
+import { FrameExportWorkerClient } from './infrastructure/FrameExportWorkerClient';
 import { decodeGif } from './infrastructure/GifService';
 import { loadImageFromFile, loadImagesFromFiles } from './infrastructure/ImageLoader';
 import type { GridConfig } from './domain/FrameLogic';
@@ -38,6 +39,17 @@ function App() {
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const videoAnimationRef = useRef<number | null>(null);
+  const exportWorkerRef = useRef<FrameExportWorkerClient | null>(null);
+
+  // The export worker is created once and disposed with the editor.
+  useEffect(() => {
+    const client = new FrameExportWorkerClient();
+    exportWorkerRef.current = client;
+    return () => {
+      client.dispose();
+      exportWorkerRef.current = null;
+    };
+  }, []);
 
   // Calculate optimal zoom to fit content in viewport
   const calculateOptimalZoom = useCallback((contentWidth: number, contentHeight: number): number => {
@@ -566,12 +578,32 @@ function App() {
   }, []);
 
   // Handle export
+  // The multi frame exports (ZIP, GIF) run in a worker when the browser has
+  // OffscreenCanvas, otherwise the identical pipeline runs inline.
+  const exportFrames = useCallback(
+    async (mode: 'zip' | 'gif', activeOnly: boolean): Promise<Blob> => {
+      if (!state.image) throw new Error('No image loaded');
+      const targetImage = state.processedImage || state.image;
+      const client = exportWorkerRef.current;
+      if (!client) throw new Error('Export client is not ready');
+
+      return client.export(readSourceBuffer(targetImage), viewModel.getFrames(), mode, {
+        activeOnly,
+        fps: state.fps,
+      });
+    },
+    [state.image, state.processedImage, state.fps]
+  );
+
   const handleExportZip = useCallback(async () => {
     if (!state.image) return;
-    const targetImage = state.processedImage || state.image;
-    const blob = await exportAsZip(targetImage, viewModel.getFrames());
-    downloadBlob(blob, 'frames.zip');
-  }, [state.image, state.processedImage]);
+    try {
+      const blob = await exportFrames('zip', true);
+      downloadBlob(blob, 'frames.zip');
+    } catch (error) {
+      console.error('ZIP export failed:', error);
+    }
+  }, [state.image, exportFrames]);
 
   const handleExportSpriteSheet = useCallback(async () => {
     if (!state.image) return;
@@ -582,10 +614,13 @@ function App() {
 
   const handleExportGif = useCallback(async () => {
     if (!state.image) return;
-    const targetImage = state.processedImage || state.image;
-    const blob = await exportAsGif(targetImage, viewModel.getFrames(), state.fps);
-    downloadBlob(blob, 'animation.gif');
-  }, [state.image, state.processedImage, state.fps]);
+    try {
+      const blob = await exportFrames('gif', true);
+      downloadBlob(blob, 'animation.gif');
+    } catch (error) {
+      console.error('GIF export failed:', error);
+    }
+  }, [state.image, exportFrames]);
 
   // Canvas click handler for frame toggle or eyedropper
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {

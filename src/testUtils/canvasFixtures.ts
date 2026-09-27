@@ -60,4 +60,9 @@ export class FakeConvertibleCanvas extends FakeCanvas {
   async convertToBlob(): Promise<Blob> {
     return new Blob([this.payload], { type: 'image/png' });
   }
+
+  /** HTMLCanvasElement flavoured encoder. */
+  toBlob(callback: BlobCallback): void {
+    callback(new Blob([this.payload], { type: 'image/png' }));
+  }
 }

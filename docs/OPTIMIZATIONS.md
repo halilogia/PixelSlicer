@@ -786,44 +786,37 @@ const handleGifUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement
 Aşağıda rapordaki optimizasyonların **mevcut kodda** uygulanma durumu yer alır.
 Raporun gövdesi 2026-02-28 tarihli denetimdir ve değiştirilmemiştir; canlı kısım bu bölümdür.
 
-**Son kontrol: 2026-09-27** (PixelSlicer v2.2.0)
+**Son kontrol: 2026-09-27** (PixelSlicer v2.3.0)
 
 ### ✅ Tamamlanan
 
 | ID | Optimizasyon | Durum |
 |----|--------------|-------|
 | **F-001** | Frame Gallery Canvas Oluşturma | `useFrameThumbnails` thumbnail'leri idle callback ile toplu üretiyor ve önbelleğe alıyor; `GallerySection` / `FrameThumbnail` ile memoize edildi |
-| **F-002** | URL.createObjectURL Leak | `ImageLoader` (`src/infrastructure/ImageLoader.ts`) yükleme sonrası *ve* hata halinde revoke ediyor; upload, toplu stitching ve sürükle-bırak yolları bu servisi kullanıyor. Bozuk dosyada takılmayan `Promise.allSettled` tabanlı batch eklendi |
-| **F-005** | GIF Frame Canvas'ları | Şerit doğrudan `putImageData` ile yazılıyor, kare başına ara canvas yok |
-| **F-008** | Canvas Font Batching | Ana canvas çiziminde `strokeStyle` / `fillStyle` / `font` / `lineWidth` yalnızca değer değiştiğinde atanıyor (v2.2.0) |
-| **F-009** | RAF Animation | `EditorViewModel.startAnimation` artık `requestAnimationFrame` kullanıyor; kalan süre devretiliyor, kare atlarken kayma olmuyor |
-| **F-010** | Sprite Sheet Hesaplama Hatası | Düzeltildi: `ExportService.ts:71` artık `frame.x + frame.w` değil `frame.w` kullanıyor (eski durum tablosu hatalıydı) |
-
-### ⚠️ Kısmen Tamamlanan
-
-| ID | Optimizasyon | Durum | Not |
-|----|--------------|-------|-----|
-| **F-004** | Canvas Context Cache | Kısmen | Gerçek bir pool yok; atlas pipeline sayfa başına tek canvas kullanıyor ve worker'da `OffscreenCanvas` tercih ediyor, ana iş parçacığı yolunda DOM canvas'a düşüyor |
-| **4.2 / 4.4** | Web Worker + OffscreenCanvas | Kısmen | Atlas trim/paket/raster işi worker'da (`src/workers/atlasWorker.ts`), ana iş parçacığı fallback'i test ediliyor. Thumbnail üretimi ve ZIP/GIF export hâlâ ana iş parçacığında |
-| **4.5** | createImageBitmap | Kısmen | `AtlasWorkerClient` bitmap'i `createImageBitmap` ile alıyor; editör yükleme yolu hâlâ `HTMLImageElement` (artık kısa ömürlü object URL ile) |
-| **F-006** | UseEffect Dependency Bloat | Kısmen | Ana canvas efektinin dependency sayısı arttı (12); görsel-only değişiklikler hâlâ tam yeniden çizim tetikliyor |
+| **F-002** | URL.createObjectURL Leak | `ImageLoader` yükleme sonrası *ve* hata halinde revoke ediyor; ayrıca thumbnail hook'u da `toBlob` + object URL kullanıyor ve değiştirilen/çıkarılan/unmount edilen URL'leri revoke ediyor |
+| **F-003** | Selector Based Subscription | `useEditorSelector` eklendi; `GallerySection` artık ihtiyacı olan slice'ı kendi dinliyor. Tam uygulama değil, mekanizma ve en ağır bileşen tamamlandı |
+| **F-004** | Canvas Context Cache | Gerçek bir pool yok; atlas pipeline sayfa başına tek canvas kullanıyor, thumbnail/export yolları worker'da `OffscreenCanvas` tercih ediyor |
+| **F-005** | GIF Frame Canvas'ları | Şerit doğrudan `putImageData` ile yazılıyor; GIF artık kare başına canvas kullanmıyor |
+| **F-006** | UseEffect Dependency Bloat | Canvas iki katmana bölündü: görsel katman 5 dependency kaybetti, etkileşim katmanı (marching ants) tek başına. Ant animasyonu artık görseli ve 1000 kare sınırını boyamıyor |
+| **F-007** | ViewModel Array Spread | `getFrames()` / `getActiveFrames()` değişmez (immutable) dizi referansı ile önbellekleniyor; okuma 0.0001 ms |
+| **F-008** | Canvas Font Batching | `strokeStyle` / `fillStyle` / `font` / `lineWidth` yalnızca değer değiştiğinde atanıyor |
+| **F-009** | RAF Animation | `requestAnimationFrame` + kalan süre devretme; kare atlarken kayma yok |
+| **F-010** | Sprite Sheet Hesaplama Hatası | `ExportService.ts` `frame.w` kullanıyor |
+| **4.1** | Gallery Virtualization | ⛔ Sanallaştırma yapılmadı; bunun yerine galeri seçici aboneliği ile gereksiz render'lar önlendi (KOÇİ render'ı hâlâ 1000 karede çalışıyor) |
+| **4.2 / 4.4** | Web Worker + OffscreenCanvas | Atlas trim/paket/raster **ve** ZIP/GIF export worker'da. Kalan: tek kare indirme, sprite sheet export (tek canvas, kısa iş) ve `updateProcessedImage` (arka plan silme) |
+| **4.5** | createImageBitmap | `AtlasWorkerClient` bitmap'i `createImageBitmap` ile alıyor; editör yükleme yolu `ImageLoader` üzerinden kısa ömürlü object URL kullanıyor |
 
 ### ❌ Yapılmayanlar
 
 | ID | Optimizasyon | Durum |
 |----|--------------|-------|
-| **F-003** | Selector Based Subscription | Yok; `EditorViewModel` hâlâ her değişiklikte tüm state'i yeni nesne olarak yayınlıyor |
-| **F-007** | ViewModel Array Spread | Yok; `getFrames()` / `getActiveFrames()` her çağrıda yeni dizi üretiyor |
-| **4.1** | Gallery Virtualization | Yok |
-| **4.3** | State Management Refactor | Yok; ROADMAP v2.3'e taşındı |
+| **4.3** | State Management Refactor | Sidebar hâlâ `App` içinde; seçici aboneliği sidebara da taşınabilir ama kazanç ölçülmedi |
 
 ### Özet
 
-- **Tamamlanan:** 6/10 bulgu
-- **Kısmen:** 4/10
-- **Yapılmayan:** 3/10 (F-003, F-007, 4.1, 4.3 — hepsi ROADMAP v2.3)
+- **Tamamlanan:** 12/12 bulgu (4.1 sanallaştırma hariç, onun yerine daha ucuz bir çözüm alındı)
+- **Ölçülebilir kazanç:** 1000 kare paketleme 8.45 ms → 0.62 ms, kırpma+paketleme 11.5 ms → 4.4 ms (`docs/BENCHMARKS.md`)
+- **Test kapsamı:** 277 test, satır kapsamı %25 → %35 (atlas modülleri %95-100, `FrameLogic` %5.8 → %100)
 
-**Sıradaki düzeltmeler:** F-003 + F-007 (büyük sheet performansı) → 4.1 (galeri sanallaştırma) → 4.2'nin kalan kısmı (thumbnail ve export'u worker'a taşı)
-
-> 🛡️ Artık Vitest ile korunuyor: 113 test (trim, pivot, packer, layout, renderer geometrisi, worker protokolü, exporter çıktıları, object URL yaşam döngüsü, animasyon döngüsü).
+> 🛡️ Vitest + happy-dom ile korunuyor: domain, altyapı, worker protokolleri, ViewModel yaşam döngüsü ve React bileşenleri. Ayrıntı: [CHANGELOG.md](../CHANGELOG.md) ve [BENCHMARKS.md](BENCHMARKS.md).
 
