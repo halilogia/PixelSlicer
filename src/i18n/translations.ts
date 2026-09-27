@@ -35,6 +35,8 @@ export const translations = {
     fit: 'Sığdır',
     speed: 'Hız (FPS)',
 
+    galleryEmpty: 'Henüz kare oluşturulmadı.',
+
     // Sidebar - Export
     sheetColumns: 'Sheet Sütun',
     downloadSpriteSheet: 'Sprite Sheet',
@@ -184,6 +186,8 @@ export const translations = {
     previewAuto: 'Auto',
     fit: 'Fit',
     speed: 'Speed (FPS)',
+
+    galleryEmpty: 'No frames yet.',
 
     // Sidebar - Export
     sheetColumns: 'Sheet Columns',

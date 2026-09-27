@@ -32,18 +32,27 @@ type CompleteCallback = (frames: ExtractedFrame[]) => void;
 
 export class VideoFrameExtractor {
   private video: HTMLVideoElement | null = null;
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  private canvas: HTMLCanvasElement | null = null;
+  private ctx: CanvasRenderingContext2D | null = null;
   private abortController: AbortController | null = null;
   private extractedFrames: ExtractedFrame[] = [];
 
-  constructor() {
-    this.canvas = document.createElement('canvas');
-    const ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) {
-      throw new Error('Could not get canvas context');
+  /**
+   * The scratch canvas is created on first use: the extractor is instantiated
+   * at module level, and a canvas at import time breaks every test runner and
+   * any environment without a 2D context.
+   */
+  private getContext(): CanvasRenderingContext2D {
+    if (!this.ctx) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) {
+        throw new Error('Could not get canvas context');
+      }
+      this.canvas = canvas;
+      this.ctx = ctx;
     }
-    this.ctx = ctx;
+    return this.ctx;
   }
 
   /**
@@ -106,8 +115,10 @@ export class VideoFrameExtractor {
         }
 
         // Set canvas size
-        this.canvas.width = Math.floor(canvasWidth);
-        this.canvas.height = Math.floor(canvasHeight);
+        this.getContext();
+        const scratch = this.canvas!;
+        scratch.width = Math.floor(canvasWidth);
+        scratch.height = Math.floor(canvasHeight);
 
         // Calculate frame intervals
         const totalFramesToExtract = Math.min(
@@ -191,20 +202,22 @@ export class VideoFrameExtractor {
    * Capture current frame from video
    */
   private captureFrame(id: number, timestamp: number): ExtractedFrame {
-    if (!this.video || !this.ctx) {
+    if (!this.video) {
       throw new Error('Video or context not initialized');
     }
 
     // Draw video frame to canvas
-    this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+    const ctx = this.getContext();
+    const canvas = this.canvas!;
+    ctx.drawImage(this.video, 0, 0, canvas.width, canvas.height);
 
     // Get image data
-    const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     // Create a separate canvas for this frame (for easy rendering)
     const frameCanvas = document.createElement('canvas');
-    frameCanvas.width = this.canvas.width;
-    frameCanvas.height = this.canvas.height;
+    frameCanvas.width = canvas.width;
+    frameCanvas.height = canvas.height;
     const frameCtx = frameCanvas.getContext('2d');
     if (frameCtx) {
       frameCtx.putImageData(imageData, 0, 0);

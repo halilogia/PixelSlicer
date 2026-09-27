@@ -62,8 +62,13 @@ Path alias'ları `tsconfig.json`, `vite.config.ts` ve `vitest.config.ts` içinde
 ## 8. Test kuralları
 
 - Vitest, Node ortamında çalışır; tarayıcı API'leri `src/testUtils/` içindeki fixture'lar ile değiştirilir (ad hoc mock yok).
-- React testleri dosya başına `// @vitest-environment happy-dom` ile DOM alır; `document` nesnesinin tamamını stub'lamak testing-library'i kırar, `HTMLCanvasElement.prototype` metotlarını stub'la.
+- React testleri dosya başına `// @vitest-environment happy-dom` ile DOM alır. `document` nesnesinin tamamını stub'lamak testing-library'i kırar: `HTMLCanvasElement.prototype` metotlarını veya `document.createElement`'i spy ile değiştir.
+- **Modül yükleme sırasında canvas/worker açılmaz.** `App.tsx` modül kapsamında servis örneği oluşturur; bu yüzden servisler kendi kaynağını ilk kullanımda yaratır. Testi yazılamayan her yan etki bir tasarım kusurudur.
+- `happy-dom`da düzen (layout) yok: sıfır boyutlu canvas'a olay gönderirken `pointerEventsCheck: 0` gerekir, `position: sticky` gibi CSS değerleri `getComputedStyle` ile doğrulanamaz (o tarayıcıda Playwright'in işi).
+- Asenkron üretim (JSZip, worker) testte `vi.waitFor` ile beklenir; `act(async)` tek başına yeterli değildir.
+- Test dosyasına PowerShell `Set-Content` ile yazma: ASCII dışı karakterler bozulur. Türkçe metin içeren iddiaları `document.documentElement.lang` gibi ASCII kontrolleriyle doğrula.
 - Canvas geometrisi (hangi `drawImage` çağrıları, hangi koordinatlar) fixture context ile doğrulanır.
 - Motor çıktıları **parse edilip** assert edilir (tam JSON / `.tres` içeriği), sadece "dizi boş değil" değil.
+- Byte seviyesinde çıktı (GIF, descriptor) checksum ile karşılaştırılır; ZIP içerik listesi ayrıca assert edilir çünkü JSZip zaman damgası yazar.
 - Worker protokolü: mesaj alanları, transfer edilebilirler ve fallback yolları test edilir.
-- Node'un taklit edemediği tarayıcı davranışı (marka kontrolleri, gerçek canvas) için `npm run test:e2e` (Playwright) vardır. v2.3'te gerçek bir tarayıcı hatası sadece burada yakalandı.
+- Node'un taklit edemediği tarayıcı davranışı (marka kontrolleri, gerçek canvas, indirme) için `npm run test:e2e` vardır: Chromium, Firefox ve WebKit.

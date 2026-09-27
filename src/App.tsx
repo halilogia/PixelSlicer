@@ -1224,6 +1224,7 @@ function App() {
               className="btn btn--primary"
               style={{ width: '100%', marginBottom: '8px' }}
               onClick={handleExportSpriteSheet}
+              disabled={!state.image}
             >
               <i className="fa-solid fa-image"></i> {t('downloadSpriteSheet')}
             </button>
@@ -1231,6 +1232,7 @@ function App() {
               className="btn btn--success"
               style={{ width: '100%', marginBottom: '8px', backgroundColor: '#9ece6a', color: '#1a1b26' }}
               onClick={handleExportGif}
+              disabled={!state.image}
             >
               <i className="fa-solid fa-film"></i> {t('downloadGif')}
             </button>
@@ -1238,6 +1240,7 @@ function App() {
               className="btn btn--secondary"
               style={{ width: '100%', backgroundColor: '#bb9af7', color: '#1a1b26' }}
               onClick={handleExportZip}
+              disabled={!state.image}
             >
               <i className="fa-solid fa-file-zipper"></i> {t('downloadZip')}
             </button>
@@ -1301,6 +1304,7 @@ function App() {
               </div>
             )}
             <canvas
+              id="mainCanvas"
               className="canvas__layer canvas__layer--image"
               ref={mainCanvasRef}
               onClick={handleCanvasClick}

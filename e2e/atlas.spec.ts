@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import JSZip from 'jszip';
-import { createSheetPng, SHEET_CELLS, type SheetOptions } from './support/sheetPng';
+import { createSheetPng, FIXTURE_CELLS, type SheetOptions } from './support/sheetPng';
 
 const readFile = (path: string) => readFileSync(path);
 
@@ -14,14 +14,14 @@ async function uploadSheet(page: Page, options: SheetOptions = {}): Promise<void
 
   await page.goto('/');
   await page.getByTestId('image-upload-input').setInputFiles(path);
-  await expect(page.locator('.frame-item')).toHaveCount(SHEET_CELLS);
+  await expect(page.locator('.frame-item')).toHaveCount(FIXTURE_CELLS);
 }
 
 test('slices an uploaded sheet into the gallery', async ({ page }) => {
   await uploadSheet(page);
 
   // Thumbnails are generated in idle batches, the tiles show the shimmer first.
-  await expect(page.locator('.frame-item__img')).toHaveCount(SHEET_CELLS);
+  await expect(page.locator('.frame-item__img')).toHaveCount(FIXTURE_CELLS);
   await expect(page.locator('.frame-item__placeholder-shimmer')).toHaveCount(0);
 });
 
@@ -111,10 +111,12 @@ test('rotates, renames and groups without breaking the build', async ({ page }) 
   await expect(page.getByTestId('atlas-name-0')).toHaveValue('hero_0007');
   await expect(page.getByTestId('atlas-name-7')).toHaveValue('hero_0014');
 
-  // A manual rename survives the next build. The build button stays reachable
-  // because the preview header is sticky while the name list is scrolled.
+  // A manual rename survives the next build. The list is collapsed first: with
+  // a long list open the modal scrolls and the build button moves out of reach.
   await page.getByTestId('atlas-name-0').fill('hero_walk_01');
+  await page.locator('.atlas__names summary').click();
   await page.getByTestId('atlas-build').click();
+  await page.locator('.atlas__names summary').click();
   await expect(page.getByTestId('atlas-name-0')).toHaveValue('hero_walk_01');
 });
 

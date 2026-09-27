@@ -45,8 +45,9 @@ afterEach(() => {
 
 describe('GallerySection', () => {
   it('shows an empty state before an image is loaded', () => {
+    window.localStorage.setItem('pixelslicer_lang', 'en');
     render(<GallerySection viewModel={new EditorViewModel()} />);
-    expect(screen.getByText('Henüz kare oluşturulmadı.')).toBeTruthy();
+    expect(screen.getByText('No frames yet.')).toBeTruthy();
   });
 
   it('renders one tile per frame of the grid', () => {

@@ -2,6 +2,27 @@
 
 All notable changes to the PixelSlicer project will be documented in this file.
 
+## [2.5.0] - 2026-09-27
+
+### Added
+- **Component tests for `App.tsx`**: the shell, the upload and export actions, the settings and video modals, the language switch, the sidebar (manual mode, manual add, grid inputs, atlas entry, pivot picking, pivot presets, auto trim) and the stacked canvas layers. `App.tsx` went from 0% to ~48% coverage.
+- **Component tests for the Atlas Packer modal**: one test per option (trim, page size, naming, rename, rotation, grouping, formats), the statistics, the preview, the sticky header and the error path.
+- **Golden tests for the export pipeline**: the fixture sheet is decoded to real pixels (a small PNG decoder lives next to the encoder in `src/testUtils/fixtureSheet.ts`), so `cropFrame`, `composeFrameCell`, the GIF bytes and the Phaser descriptor are asserted against a checksum and hand computed values. A single flipped pixel changes the GIF checksum; the 4 bit palette swallows the change on black, which the test documents.
+- **Video infrastructure tests**: the grid maths, the frame cleanup, the canvas conversion and the file validation rules.
+- **Playwright on Firefox and WebKit**: the suite now runs on all three engines (18 scenarios). The atlas worker, the OffscreenCanvas raster and the downloads behave the same everywhere.
+- A shared fixture sheet: the unit tests and the browser tests generate the same PNG from `src/testUtils/fixtureSheet.ts`.
+
+### Fixed
+- **The export buttons were not disabled without an image**: "Download ZIP" and friends were clickable and did nothing.
+- **A canvas was created at import time**: `new VideoFrameExtractor()` ran in the `App` module scope and threw wherever there is no 2D context. The scratch canvas is now created on first use, which is what made the component testable in the first place.
+- The main canvas lost its `id="mainCanvas"`, so the CSS rule and anything looking it up by id stopped matching.
+- The gallery empty state was hard coded Turkish while the rest of the interface is translated.
+
+### Changed
+- Coverage: 38% → **68%** line coverage, 313 → **366** unit/component tests, 6 → 18 browser scenarios. The floors moved to 65% lines / 68% functions / 82% branches, with the per area floors (domain 90, atlas 90, ViewModel 90) unchanged.
+- CI installs Chromium, Firefox and WebKit for the end to end job.
+- `ROADMAP.md` drops the finished v2.5 test section, `docs/KNOWLEDGE.md` documents the happy-dom rules.
+
 ## [2.4.0] - 2026-09-27
 
 ### Added

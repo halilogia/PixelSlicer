@@ -4,6 +4,7 @@
 import React, { useCallback, memo } from 'react';
 import type { Frame } from '../domain/FrameLogic';
 import { useFrameThumbnails } from '../hooks/useFrameThumbnails';
+import { useI18n } from '@/i18n/useI18n';
 import { useEditorSelector } from '../hooks/useEditorSelector';
 import FrameThumbnail from './FrameThumbnail';
 import { EditorViewModel } from '../presentation/EditorViewModel';
@@ -19,6 +20,7 @@ interface GallerySectionProps {
  * re-renders a thousand thumbnails.
  */
 const GallerySection: React.FC<GallerySectionProps> = ({ viewModel }) => {
+  const { t } = useI18n();
   const image = useEditorSelector(viewModel, state => state.processedImage || state.image);
   const isImageLoaded = useEditorSelector(viewModel, state => state.isImageLoaded);
   const isManualMode = useEditorSelector(viewModel, state => state.isManualMode);
@@ -74,7 +76,7 @@ const GallerySection: React.FC<GallerySectionProps> = ({ viewModel }) => {
   if (!isImageLoaded || frames.length === 0) {
     return (
       <div className="gallery" id="framesGallery">
-        <p className="gallery-empty">Henüz kare oluşturulmadı.</p>
+        <p className="gallery-empty">{t('galleryEmpty')}</p>
       </div>
     );
   }
