@@ -39,7 +39,7 @@ function boxesOverlap(
 describe('buildAtlasLayout', () => {
   it('returns an empty layout for an empty frame list', () => {
     const layout = buildAtlasLayout({ frames: [], buffer: null, options: options() });
-    expect(layout).toEqual({ pages: [], sprites: [], occupancy: 0, savedPixels: 0 });
+    expect(layout).toEqual({ pages: [], sprites: [], occupancy: 0, savedPixels: 0, warnings: [] });
   });
 
   it('trims the transparent borders and reports the offset', () => {

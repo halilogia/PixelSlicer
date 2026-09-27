@@ -95,6 +95,7 @@ describe('AtlasWorkerClient.build', () => {
         sprites: [],
         occupancy: 0.5,
         savedPixels: 10,
+        warnings: [],
       },
       pages,
     });
@@ -147,7 +148,7 @@ describe('AtlasWorkerClient.build', () => {
     const worker = FakeWorker.instances[0];
     worker.respond({
       id: worker.posted[0].message.id,
-      layout: { pages: [], sprites: [], occupancy: 0, savedPixels: 0 },
+      layout: { pages: [], sprites: [], occupancy: 0, savedPixels: 0, warnings: [] },
       pages: [],
       error: 'sprite does not fit',
     });
@@ -169,7 +170,7 @@ describe('AtlasWorkerClient.build', () => {
 
     worker.respond({
       id: worker.posted[0].message.id,
-      layout: { pages: [], sprites: [], occupancy: 0, savedPixels: 0 },
+      layout: { pages: [], sprites: [], occupancy: 0, savedPixels: 0, warnings: [] },
       pages: [],
     });
 
@@ -185,7 +186,7 @@ describe('AtlasWorkerClient.build', () => {
     const worker = FakeWorker.instances[0];
     worker.respond({
       id: worker.posted[0].message.id,
-      layout: { pages: [], sprites: [], occupancy: 0, savedPixels: 0 },
+      layout: { pages: [], sprites: [], occupancy: 0, savedPixels: 0, warnings: [] },
       pages: [],
     });
     await promise;

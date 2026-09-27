@@ -388,10 +388,10 @@ describe('EditorViewModel background removal', () => {
     expect(model.getState().processedImage).toBe(model.getState().image);
   });
 
-  it('produces a processed canvas when enabled', () => {
+  it('produces a processed canvas when enabled', async () => {
     const model = new EditorViewModel();
     seedImage(model);
-    model.toggleRemoveBackground();
+    await model.toggleRemoveBackground();
 
     const processed = model.getState().processedImage;
     expect(processed).not.toBe(model.getState().image);
@@ -399,13 +399,13 @@ describe('EditorViewModel background removal', () => {
     expect((processed as unknown as FakeCanvas).height).toBe(64);
   });
 
-  it('reprocesses when the tolerance changes', () => {
+  it('reprocesses when the tolerance changes', async () => {
     const model = new EditorViewModel();
     seedImage(model);
-    model.toggleRemoveBackground();
+    await model.toggleRemoveBackground();
     const first = model.getState().processedImage;
 
-    model.setRemoveBgColor(255, 0, 0, 10);
+    await model.setRemoveBgColor(255, 0, 0, 10);
     expect(model.getState().removeBgColor).toEqual({ r: 255, g: 0, b: 0, tolerance: 10 });
     expect(model.getState().processedImage).not.toBe(first);
   });

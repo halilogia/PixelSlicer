@@ -32,7 +32,7 @@ function chunk(type: string, data: Buffer): Buffer {
 }
 
 /** RGBA pixels: one hue per cell, transparent borders. */
-function pixels(): Buffer {
+function pixels(transparentCells: readonly number[] = []): Buffer {
   const width = COLS * CELL;
   const height = ROWS * CELL;
   const raw = Buffer.alloc(height * (width * 4 + 1));
@@ -51,14 +51,19 @@ function pixels(): Buffer {
       raw[offset] = (cellIndex * 31) % 256;
       raw[offset + 1] = (cellIndex * 67) % 256;
       raw[offset + 2] = (cellIndex * 97) % 256;
-      raw[offset + 3] = opaque ? 255 : 0;
+      raw[offset + 3] = opaque && !transparentCells.includes(cellIndex) ? 255 : 0;
     }
   }
 
   return raw;
 }
 
-export function createSheetPng(): Buffer {
+export interface SheetOptions {
+  /** Cells that stay fully transparent, to exercise the empty frame warning. */
+  transparentCells?: number[];
+}
+
+export function createSheetPng(options: SheetOptions = {}): Buffer {
   const width = COLS * CELL;
   const height = ROWS * CELL;
 
@@ -74,7 +79,7 @@ export function createSheetPng(): Buffer {
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', header),
-    chunk('IDAT', deflateSync(pixels())),
+    chunk('IDAT', deflateSync(pixels(options.transparentCells ?? []))),
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }

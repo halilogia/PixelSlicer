@@ -57,7 +57,7 @@ export async function exportAsZip(
  * Export frames as a sprite sheet
  */
 export async function exportAsSpriteSheet(
-  image: HTMLImageElement | HTMLCanvasElement,
+  image: AtlasSourceImage,
   frames: readonly Frame[],
   columns: number,
   activeOnly: boolean = true
@@ -114,7 +114,7 @@ export async function exportAsSpriteSheet(
  * Export a single frame as PNG
  */
 export async function exportSingleFrame(
-  image: HTMLImageElement | HTMLCanvasElement,
+  image: AtlasSourceImage,
   frame: Frame
 ): Promise<Blob> {
   const canvas = document.createElement('canvas');

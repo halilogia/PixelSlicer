@@ -53,7 +53,9 @@ Path alias'ları `tsconfig.json`, `vite.config.ts` ve `vitest.config.ts` içinde
 ## 7. Performans kuralları
 
 - Kare dizileri **değişmezdir** (`addManualFrame`, `updateManualFrame`, `resizeManualFrame`, `deleteManualFrame` yeni dizi atar). Bu kimlik, `getFrames()` / `getActiveFrames()` önbelleğinin geçerli olma koşuludur; in-place `push`/`splice` eklemek sessizce bayat liste üretir.
-- Ağır iş (atlas trim/paket/raster, ZIP/GIF export) bir Web Worker'da çalışır; ana iş parçacığı yolu **aynı** pipeline'ı kullanır, kopya kod yoktur.
+- Ağır iş (atlas trim/paket/raster, ZIP/GIF export, arka plan rengi silme) bir Web Worker'da çalışır; ana iş parçacığı yolu **aynı** pipeline'ı kullanır, kopya kod yoktur.
+- Asenkron state güncellemeleri **jetonla korunur**: yavaş bir çalışma daha yenisinin sonucunu ezmez (`EditorViewModel.processedToken`).
+- Packer iki fazlıdır: (1) her şeyi sığdıran en küçük sayfa, (2) sığmayan durumda izin verilen en büyük sayfayı tam animasyon gruplarıyla doldur. "Bir sprite = bir sayfa" gibi dejenere çıktılar regresyondur.
 - Performans değişikliği `npm run bench` ile kanıtlanır, tahminle değil. Taban değerler `docs/BENCHMARKS.md`.
 - React tarafında ağır bileşenler (`GallerySection`) props almak yerine `useEditorSelector` ile kendi slice'ını dinler.
 

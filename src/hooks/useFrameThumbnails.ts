@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Frame } from '../domain/FrameLogic';
+import type { AtlasSourceImage } from '../infrastructure/atlas/AtlasRenderer';
 import { scheduleTask, cancelScheduledTask } from '../utils/scheduler';
 
 export interface ThumbnailOptions {
@@ -26,7 +27,7 @@ function revoke(url: string | undefined): void {
 }
 
 export function useFrameThumbnails(
-  image: HTMLImageElement | HTMLCanvasElement | null,
+  image: AtlasSourceImage | null,
   frames: readonly Frame[],
   options: ThumbnailOptions = {}
 ): Map<number, string> {
@@ -36,7 +37,7 @@ export function useFrameThumbnails(
   // Refs for version tracking
   const frameVersionsRef = useRef<Map<number, number>>(new Map());
   const pendingUpdateRef = useRef<number | null>(null);
-  const lastImageRef = useRef<HTMLImageElement | HTMLCanvasElement | null>(null);
+  const lastImageRef = useRef<AtlasSourceImage | null>(null);
 
   /**
    * Draw one frame and hand back an object URL.

@@ -80,7 +80,22 @@ describe('exportAtlasZip', () => {
     vi.stubGlobal('HTMLCanvasElement', FakeConvertibleCanvas);
 
     const entries = await listEntries(await exportAtlasZip(bundleInput(['unity'])));
-    expect(entries).toEqual(['README.txt', 'Unity/PixelSlicerAtlas.cs', 'atlas.png', 'unity.json']);
+    expect(entries).toEqual([
+      'PixelSlicerAtlas.spriteatlas',
+      'README.txt',
+      'Unity/PixelSlicerAtlas.cs',
+      'atlas.png',
+      'atlas.png.meta',
+      'unity.json',
+    ]);
+  });
+
+  it('writes the Starling descriptors and xml', async () => {
+    vi.stubGlobal('OffscreenCanvas', FakeConvertibleCanvas);
+    vi.stubGlobal('HTMLCanvasElement', FakeConvertibleCanvas);
+
+    const entries = await listEntries(await exportAtlasZip(bundleInput(['starling'])));
+    expect(entries).toEqual(['README.txt', 'atlas.png', 'atlas.xml', 'starling.json']);
   });
 
   it('numbers the pages of a multi page atlas', async () => {
@@ -121,7 +136,7 @@ describe('exportAtlasZip', () => {
     await expect(
       exportAtlasZip({
         ...bundleInput(['phaser']),
-        layout: { pages: [], sprites: [], occupancy: 0, savedPixels: 0 },
+        layout: { pages: [], sprites: [], occupancy: 0, savedPixels: 0, warnings: [] },
       })
     ).rejects.toThrow(/No active frames/);
   });

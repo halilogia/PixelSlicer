@@ -2,6 +2,31 @@
 
 All notable changes to the PixelSlicer project will be documented in this file.
 
+## [2.4.0] - 2026-09-27
+
+### Added
+- **Preview every atlas page** with page chips and a zoom control (0.25x / 0.5x / 1x / 2x); until now only the first page was visible.
+- **Editable sprite names**: a prefix + start index generates `frame_0001` style names, and the built sprite list can be renamed inline. The names are the keys in every exported descriptor, so this is the difference between `frame_0001.png` and `hero_walk_01.png`.
+- **90° rotation in the packer** (`allowRotation`): MaxRects scores both orientations and stores the transposed rect, with `rotated: true` in the Phaser, Unity, Starling and Godot metadata. Upright wins a tie.
+- **Animation aware packing** (`framesPerGroup`): frames are grouped by animation and a group is never split across pages, so an engine that binds a page to a texture never swaps mid animation.
+- **Frame warnings**: fully transparent frames (1x1 placeholders) and duplicated areas are listed in the modal instead of being silently packed.
+- **Starling exporters**: `atlas.xml` (with `frameX`/`frameY` and `rotation`) and a JSON flavour.
+- **Native Unity assets**: a `.meta` per page (sprite sheet, custom pivots) plus a `PixelSlicerAtlas.spriteatlas` with deterministic GUIDs, so the atlas imports as a real `SpriteAtlas` without the editor script. The bundled C# importer remains the fallback.
+- **Atlas import**: `readAtlasDescriptor` reads the Phaser and Godot descriptors this tool writes back into frames, for a Godot / Unity round trip.
+- **Background removal in a worker**: the colour walk runs off the main thread with an inline fallback.
+- Tests: 279 → **313**, plus 2 more Playwright scenarios (rotation + naming + grouping, and the empty frame warning). Line coverage 35.6% → 38.1%.
+
+### Fixed
+- **Pages held a single sprite** when the content was larger than the page limit: the size search gave up and fell back to one page per sprite. It now fills the largest allowed page with as many sprites (or whole groups) as fit.
+- **Out of order background removal**: a slow run could overwrite the result of a newer one; the ViewModel now guards it with a token, and the mutators are awaitable.
+- **The Build button scrolled out of reach** in the atlas modal when the sprite name list was open; the preview header is now sticky.
+- The Godot descriptor reports the rotation (AtlasTexture cannot rotate a region) and the margins still restore the untrimmed size.
+
+### Changed
+- `AtlasSourceImage` accepts `OffscreenCanvas` and `ImageBitmap`, which is what the worker based background removal and atlas pages return.
+- `README.txt` in the bundle documents the Unity, Godot and Phaser steps, including the new native Unity assets.
+- `ROADMAP.md` drops the finished v2.4 sections, `docs/OPTIMIZATIONS.md` and `docs/KNOWLEDGE.md` follow.
+
 ## [2.3.0] - 2026-09-27
 
 ### Performance

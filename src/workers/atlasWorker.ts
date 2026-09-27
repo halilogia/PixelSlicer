@@ -19,14 +19,21 @@ interface WorkerScope {
 
 const scope = self as unknown as WorkerScope;
 
-const EMPTY_LAYOUT: AtlasLayout = { pages: [], sprites: [], occupancy: 0, savedPixels: 0 };
+const EMPTY_LAYOUT: AtlasLayout = {
+  pages: [],
+  sprites: [],
+  occupancy: 0,
+  savedPixels: 0,
+  warnings: [],
+};
 
 function buildAtlas(request: AtlasWorkerRequest): AtlasWorkerResponse {
   const { layout, pages } = buildAtlasPages(
     request.source,
     request.frames,
     request.options,
-    request.pivots
+    request.pivots,
+    request.names
   );
 
   const bitmaps = pages.map(page => (page as OffscreenCanvas).transferToImageBitmap());

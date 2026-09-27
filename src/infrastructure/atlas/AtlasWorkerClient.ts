@@ -71,9 +71,10 @@ export class AtlasWorkerClient {
     source: AtlasSourceImage,
     frames: readonly Frame[],
     options: AtlasPackOptions,
-    pivots?: Record<number, Pivot>
+    pivots?: Record<number, Pivot>,
+    names?: readonly string[]
   ): AtlasBuildResult {
-    const { layout, pages } = buildAtlasPages(source, frames, options, pivots);
+    const { layout, pages } = buildAtlasPages(source, frames, options, pivots, names);
     return { layout, pages, usedWorker: false };
   }
 
@@ -82,11 +83,12 @@ export class AtlasWorkerClient {
     source: AtlasSourceImage,
     frames: readonly Frame[],
     options: AtlasPackOptions,
-    pivots?: Record<number, Pivot>
+    pivots?: Record<number, Pivot>,
+    names?: readonly string[]
   ): Promise<AtlasBuildResult> {
     const worker = this.ensureWorker();
     if (!worker) {
-      return this.buildOnMainThread(source, frames, options, pivots);
+      return this.buildOnMainThread(source, frames, options, pivots, names);
     }
 
     const id = this.nextId++;
@@ -96,6 +98,7 @@ export class AtlasWorkerClient {
       frames: frames.map(frame => ({ ...frame })),
       options,
       pivots,
+      names,
     };
 
     try {
@@ -105,7 +108,7 @@ export class AtlasWorkerClient {
       });
     } catch {
       // A worker failure must never block the export: redo the work inline.
-      return this.buildOnMainThread(source, frames, options, pivots);
+      return this.buildOnMainThread(source, frames, options, pivots, names);
     }
   }
 

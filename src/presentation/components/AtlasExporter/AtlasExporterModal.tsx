@@ -16,13 +16,14 @@ import {
   type PivotMode,
 } from '@domain/atlas/AtlasTypes';
 import { collectFramePivots } from '@domain/atlas/AtlasPivot';
+import type { AtlasSourceImage } from '@infrastructure/atlas/AtlasRenderer';
 import { atlasPageFileName, exportAtlasZip } from '@infrastructure/atlas/AtlasExportService';
 import { downloadBlob } from '@infrastructure/ExportService';
 import { AtlasWorkerClient } from '@infrastructure/atlas/AtlasWorkerClient';
 import type { AtlasBuildResult } from '@infrastructure/atlas/AtlasPipeline';
 
 interface AtlasExporterProps {
-  image: HTMLImageElement | HTMLCanvasElement;
+  image: AtlasSourceImage;
   frames: readonly Frame[];
   pivotMode: PivotMode;
   trim: boolean;
@@ -37,9 +38,11 @@ const FORMAT_LABELS: Record<AtlasFormat, string> = {
   phaser: 'Phaser 3',
   godot: 'Godot 4',
   unity: 'Unity',
+  starling: 'Starling',
 };
 
 const PAGE_SIZES = [1024, 2048, 4096, 8192];
+const ZOOM_LEVELS = [0.25, 0.5, 1, 2];
 
 export function AtlasExporterModal({
   image,
@@ -58,9 +61,16 @@ export function AtlasExporterModal({
   const [padding, setPadding] = useState(2);
   const [extrude, setExtrude] = useState(0);
   const [powerOfTwo, setPowerOfTwo] = useState(true);
+  const [allowRotation, setAllowRotation] = useState(false);
+  const [framesPerGroup, setFramesPerGroup] = useState(0);
   const [maxPageSize, setMaxPageSize] = useState(2048);
   const [formats, setFormats] = useState<AtlasFormat[]>(['phaser', 'godot', 'unity']);
   const [animationName, setAnimationName] = useState('default');
+  const [namePrefix, setNamePrefix] = useState('frame_');
+  const [nameStartIndex, setNameStartIndex] = useState(1);
+  const [activePage, setActivePage] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [renames, setRenames] = useState<Record<number, string>>({});
 
   const [result, setResult] = useState<AtlasBuildResult | null>(null);
   const [isBuilding, setIsBuilding] = useState(false);
@@ -102,15 +112,27 @@ export function AtlasExporterModal({
 
   const activeFrames = frames.filter(frame => frame.isActive);
 
+  // Names come from the prefix plus the start index, a rename always wins.
+  const spriteNames = activeFrames.map((_, index) => {
+    const generated = `${namePrefix || 'frame_'}${String(
+      nameStartIndex + index
+    ).padStart(4, '0')}`;
+    return renames[index] ?? generated;
+  });
+
   const options: AtlasPackOptions = {
     ...DEFAULT_ATLAS_PACK_OPTIONS,
     padding,
     extrude,
     powerOfTwo,
+    allowRotation,
+    framesPerGroup,
     maxPageSize,
     trim,
     alphaThreshold,
     pivotMode,
+    namePrefix,
+    nameStartIndex,
   };
 
   const build = async () => {
@@ -121,9 +143,11 @@ export function AtlasExporterModal({
         image,
         activeFrames,
         options,
-        collectFramePivots(activeFrames)
+        collectFramePivots(activeFrames),
+        spriteNames
       );
       setResult(built);
+      setActivePage(current => Math.min(current, Math.max(0, built.layout.pages.length - 1)));
     } catch (cause) {
       setResult(null);
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -132,12 +156,12 @@ export function AtlasExporterModal({
     }
   };
 
-  // Preview the first page so the user sees the result before exporting.
+  // Preview the selected page, at the selected zoom.
   useEffect(() => {
     const canvas = previewRef.current;
     if (!canvas || !result || result.pages.length === 0) return;
 
-    const page = result.pages[0];
+    const page = result.pages[Math.min(activePage, result.pages.length - 1)];
     canvas.width = page.width;
     canvas.height = page.height;
     const ctx = canvas.getContext('2d');
@@ -146,7 +170,7 @@ export function AtlasExporterModal({
     ctx.clearRect(0, 0, page.width, page.height);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(page as CanvasImageSource, 0, 0);
-  }, [result]);
+  }, [result, activePage, zoom]);
 
   const handleExport = async () => {
     if (!result) return;
@@ -176,7 +200,9 @@ export function AtlasExporterModal({
     );
   };
 
-  const pageLabel = (result?.layout.pages ?? [])
+  const pageList = result?.layout.pages ?? [];
+  const warnings = result?.layout.warnings ?? [];
+  const pageLabel = pageList
     .map(page => `${page.width}×${page.height}`)
     .join('  ·  ');
 
@@ -271,6 +297,66 @@ export function AtlasExporterModal({
               </div>
 
               <div className="form-group">
+                <label
+                  className="form-label"
+                  style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={allowRotation}
+                    onChange={() => setAllowRotation(!allowRotation)}
+                    style={{ marginRight: 0 }}
+                    data-testid="atlas-rotation"
+                  />
+                  {t('atlasAllowRotation')}
+                </label>
+                {allowRotation && <p className="atlas__hint">{t('atlasAllowRotationHint')}</p>}
+              </div>
+
+              <div className="form-group">
+                <div className="range-label">
+                  <span>{t('atlasFramesPerGroup')}</span>
+                  <span className="range-value">
+                    {framesPerGroup === 0 ? t('atlasFree') : framesPerGroup}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={16}
+                  value={framesPerGroup}
+                  onChange={event => setFramesPerGroup(parseInt(event.target.value))}
+                  data-testid="atlas-group-size"
+                />
+                <p className="atlas__hint">{t('atlasFramesPerGroupHint')}</p>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">{t('atlasNaming')}</label>
+                <div className="atlas__row">
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={namePrefix}
+                    onChange={event => {
+                      setNamePrefix(event.target.value);
+                      setRenames({});
+                    }}
+                    placeholder="frame_"
+                    data-testid="atlas-name-prefix"
+                  />
+                  <input
+                    type="number"
+                    className="form-input atlas__number"
+                    value={nameStartIndex}
+                    min={0}
+                    onChange={event => setNameStartIndex(Math.max(0, parseInt(event.target.value) || 0))}
+                    data-testid="atlas-name-start"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">{t('atlasMaxPageSize')}</label>
                 <div className="atlas__chips">
                   {PAGE_SIZES.map(size => (
@@ -333,11 +419,74 @@ export function AtlasExporterModal({
               </div>
 
               <div className="atlas__canvas-wrap canvas-bg" data-testid="atlas-preview">
-                <canvas ref={previewRef} className="atlas__canvas" />
+                <canvas
+                  ref={previewRef}
+                  className="atlas__canvas"
+                  style={{ width: `${zoom * 100}%` }}
+                />
                 {!result && (
                   <p className="atlas__hint atlas__hint--center">{t('atlasPreviewHint')}</p>
                 )}
               </div>
+
+              {pageList.length > 0 && (
+                <div className="atlas__pages">
+                  {pageList.map((page, index) => (
+                    <button
+                      key={page.index}
+                      className={`atlas__chip ${index === activePage ? 'atlas__chip--active' : ''}`}
+                      onClick={() => setActivePage(index)}
+                      data-testid={`atlas-page-${index}`}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                  <span className="atlas__zoom">
+                    {ZOOM_LEVELS.map(level => (
+                      <button
+                        key={level}
+                        className={`atlas__chip ${zoom === level ? 'atlas__chip--active' : ''}`}
+                        onClick={() => setZoom(level)}
+                        data-testid={`atlas-zoom-${level}`}
+                      >
+                        {level}x
+                      </button>
+                    ))}
+                  </span>
+                </div>
+              )}
+
+              {warnings.length > 0 && (
+                <ul className="atlas__warnings" data-testid="atlas-warnings">
+                  {warnings.map((warning, index) => (
+                    <li key={`${warning.kind}-${warning.frameIndex}-${index}`}>{warning.message}</li>
+                  ))}
+                </ul>
+              )}
+
+              {result && result.layout.sprites.length > 0 && (
+                <details className="atlas__names">
+                  <summary>{t('atlasRename')}</summary>
+                  <div className="atlas__name-list">
+                    {result.layout.sprites.map((sprite, index) => (
+                      <label key={sprite.order} className="atlas__name-row">
+                        <span className="atlas__name-page">p{sprite.page + 1}</span>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={sprite.name}
+                          onChange={event =>
+                            setRenames(current => ({ ...current, [index]: event.target.value }))
+                          }
+                          data-testid={`atlas-name-${index}`}
+                        />
+                        {sprite.rotated && <span className="atlas__badge">90°</span>}
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              )}
+
 
               {result && (
                 <div className="atlas__stats" data-testid="atlas-stats">

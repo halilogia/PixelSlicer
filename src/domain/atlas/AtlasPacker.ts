@@ -14,8 +14,11 @@ export interface PackedBox {
   id: number;
   x: number;
   y: number;
+  /** Stored width, which is the sprite height when `rotated` is true. */
   width: number;
+  /** Stored height, which is the sprite width when `rotated` is true. */
   height: number;
+  rotated: boolean;
 }
 
 export interface PackedPage {
@@ -29,6 +32,10 @@ export interface PackRectsOptions {
   powerOfTwo: boolean;
   /** Upper bound for a single page edge. */
   maxPageSize: number;
+  /** Try both orientations for every sprite. */
+  allowRotation?: boolean;
+  /** Frames per animation: a group is never split across pages. */
+  framesPerGroup?: number;
 }
 
 interface FreeRect extends Rect {}
@@ -133,26 +140,55 @@ interface Placement {
   y: number;
   shortSide: number;
   longSide: number;
+  rotated: boolean;
+  width: number;
+  height: number;
 }
 
-/** Best Short Side Fit, ties broken by the long side. */
-function findBestPlacement(free: Rect[], width: number, height: number): Placement | null {
+/**
+ * Best Short Side Fit, ties broken by the long side. Both orientations are
+ * considered when rotation is allowed, the best scoring one wins.
+ */
+function findBestPlacement(
+  free: Rect[],
+  width: number,
+  height: number,
+  allowRotation: boolean
+): Placement | null {
   let best: Placement | null = null;
 
+  const orientations: Array<{ w: number; h: number; rotated: boolean }> =
+    allowRotation && width !== height
+      ? [
+          { w: width, h: height, rotated: false },
+          { w: height, h: width, rotated: true },
+        ]
+      : [{ w: width, h: height, rotated: false }];
+
   for (const rect of free) {
-    if (rect.width < width || rect.height < height) continue;
+    for (const orientation of orientations) {
+      if (rect.width < orientation.w || rect.height < orientation.h) continue;
 
-    const leftoverX = rect.width - width;
-    const leftoverY = rect.height - height;
-    const shortSide = Math.min(leftoverX, leftoverY);
-    const longSide = Math.max(leftoverX, leftoverY);
+      const leftoverX = rect.width - orientation.w;
+      const leftoverY = rect.height - orientation.h;
+      const shortSide = Math.min(leftoverX, leftoverY);
+      const longSide = Math.max(leftoverX, leftoverY);
 
-    if (
-      best === null ||
-      shortSide < best.shortSide ||
-      (shortSide === best.shortSide && longSide < best.longSide)
-    ) {
-      best = { x: rect.x, y: rect.y, shortSide, longSide };
+      if (
+        best === null ||
+        shortSide < best.shortSide ||
+        (shortSide === best.shortSide && longSide < best.longSide)
+      ) {
+        best = {
+          x: rect.x,
+          y: rect.y,
+          shortSide,
+          longSide,
+          rotated: orientation.rotated,
+          width: orientation.w,
+          height: orientation.h,
+        };
+      }
     }
   }
 
@@ -163,24 +199,36 @@ function findBestPlacement(free: Rect[], width: number, height: number): Placeme
 export function packIntoPage(
   inputs: PackInput[],
   width: number,
-  height: number
+  height: number,
+  allowRotation: boolean = false
 ): PackedBox[] | null {
   let free: FreeRect[] = [{ x: 0, y: 0, width, height }];
   const boxes: PackedBox[] = [];
 
   for (const input of inputs) {
-    if (input.width > width || input.height > height) return null;
+    if (input.width > width || input.height > height) {
+      if (!allowRotation) return null;
+      if (Math.max(input.width, input.height) > Math.max(width, height)) return null;
+      if (Math.min(input.width, input.height) > Math.min(width, height)) return null;
+    }
 
-    const placement = findBestPlacement(free, input.width, input.height);
+    const placement = findBestPlacement(free, input.width, input.height, allowRotation);
     if (!placement) return null;
 
     const used: Rect = {
       x: placement.x,
       y: placement.y,
-      width: input.width,
-      height: input.height,
+      width: placement.width,
+      height: placement.height,
     };
-    boxes.push({ id: input.id, ...used });
+    boxes.push({
+      id: input.id,
+      x: placement.x,
+      y: placement.y,
+      width: placement.width,
+      height: placement.height,
+      rotated: placement.rotated,
+    });
 
     const next: FreeRect[] = [];
     for (const rect of free) {
@@ -306,81 +354,170 @@ export function estimatePageSize(
   return best ? { width: best.width, height: best.height } : null;
 }
 
-/**
- * Pack every input, splitting into as many pages as needed.
- * Inputs are sorted by area (descending) while packing and restored to the
- * original order in the result, so exported metadata stays deterministic.
- */
-export function packRects(inputs: PackInput[], options: PackRectsOptions): PackedPage[] {
-  const { powerOfTwo, maxPageSize } = options;
-
-  if (inputs.length === 0) return [];
-
-  const oversized = inputs.filter(
-    input => input.width > maxPageSize || input.height > maxPageSize
-  );
-  if (oversized.length > 0) {
-    throw new Error(
-      `Sprite #${oversized[0].id} (${oversized[0].width}x${oversized[0].height}) does not fit a ${maxPageSize}px page.`
-    );
-  }
-
-  const ordered = [...inputs].sort(
+/** Largest area first: the hard to place sprites decide the page size. */
+function sortByArea(inputs: readonly PackInput[]): PackInput[] {
+  return [...inputs].sort(
     (a, b) =>
       b.width * b.height - a.width * a.height ||
       Math.max(b.width, b.height) - Math.max(a.width, a.height) ||
       a.id - b.id
   );
+}
 
-  const minWidth = ordered.reduce((max, input) => Math.max(max, input.width), 0);
-  const minHeight = ordered.reduce((max, input) => Math.max(max, input.height), 0);
-  const ascending = candidatePageSizes(minWidth, minHeight, maxPageSize, powerOfTwo);
+/** The biggest page the limit allows, which is what overflow is packed into. */
+function largestPageSize(
+  maxPageSize: number,
+  powerOfTwo: boolean
+): { width: number; height: number } {
+  const size = powerOfTwo
+    ? Math.min(maxPageSize, nextPowerOfTwo(maxPageSize))
+    : maxPageSize;
+  return { width: size, height: size };
+}
 
-  // Try the estimated page first, then walk the candidates from the smallest up.
-  const estimate = estimatePageSize(ordered, powerOfTwo, maxPageSize);
-  const candidates = estimate
-    ? [estimate, ...ascending.filter(size => size.width !== estimate.width || size.height !== estimate.height)]
-    : ascending;
-
-  const pages: PackedPage[] = [];
-  let remaining = ordered;
+/**
+ * Fill pages with as many whole groups as fit.
+ *
+ * Phase 1 looks for the smallest page that holds everything at once, starting
+ * from the balanced estimate. Phase 2 only runs when the content is larger
+ * than the page limit: then the biggest allowed page is filled with as many
+ * whole groups as fit, so a group is never split unless it has to be.
+ */
+function packGroups(
+  groups: PackInput[][],
+  candidates: Array<{ width: number; height: number }>,
+  maxPageSize: number,
+  allowRotation: boolean,
+  pages: PackedPage[],
+  powerOfTwo = true
+): void {
+  let remaining = groups.filter(group => group.length > 0);
   let guard = 0;
 
   while (remaining.length > 0) {
-    if (++guard > inputs.length + 1) break;
+    if (++guard > 4096) break;
 
-    const totalArea = remaining.reduce((sum, input) => sum + input.width * input.height, 0);
+    const all = remaining.flat();
+    const totalArea = all.reduce((sum, input) => sum + input.width * input.height, 0);
+    const estimate = estimatePageSize(all, powerOfTwo, maxPageSize);
+    const searchOrder = estimate
+      ? [estimate, ...candidates.filter(size => size.width !== estimate.width || size.height !== estimate.height)]
+      : candidates;
+
     let placed: PackedBox[] | null = null;
     let pageWidth = 0;
     let pageHeight = 0;
 
-    for (const candidate of candidates) {
+    // Phase 1: one page for everything.
+    for (const candidate of searchOrder) {
       if (candidate.width * candidate.height < totalArea) continue;
-      const boxes = packIntoPage(remaining, candidate.width, candidate.height);
-      if (boxes) {
-        placed = boxes;
-        pageWidth = candidate.width;
-        pageHeight = candidate.height;
+      const boxes = packIntoPage(all, candidate.width, candidate.height, allowRotation);
+      if (!boxes) continue;
+      placed = boxes;
+      pageWidth = candidate.width;
+      pageHeight = candidate.height;
+      break;
+    }
+
+    // Phase 2: fill the biggest allowed page with whole groups.
+    if (!placed) {
+      const biggest = largestPageSize(maxPageSize, powerOfTwo);
+      const batch: PackInput[] = [];
+
+      for (const group of remaining) {
+        const attempt = batch.concat(group);
+        if (packIntoPage(attempt, biggest.width, biggest.height, allowRotation)) {
+          batch.push(...group);
+          continue;
+        }
+        if (batch.length === 0) {
+          // The group is larger than a whole page: fill the page with as many
+          // of its sprites as fit, the rest continues on the next page.
+          for (const input of group) {
+            if (!packIntoPage(batch.concat(input), biggest.width, biggest.height, allowRotation)) {
+              break;
+            }
+            batch.push(input);
+          }
+        }
         break;
+      }
+
+      if (batch.length > 0) {
+        const boxes = packIntoPage(batch, biggest.width, biggest.height, allowRotation);
+        if (boxes) {
+          placed = boxes;
+          pageWidth = biggest.width;
+          pageHeight = biggest.height;
+        }
       }
     }
 
     if (!placed) {
-      // A single sprite may not fit any page by itself: give it a dedicated page.
-      const single = remaining[0];
+      // One sprite that cannot fit any page: give it a dedicated page.
+      const single = all[0];
       const width = powerOfTwo ? nextPowerOfTwo(single.width) : single.width;
       const height = powerOfTwo ? nextPowerOfTwo(single.height) : single.height;
-      placed = [{ id: single.id, x: 0, y: 0, width: single.width, height: single.height }];
+      placed = [
+        { id: single.id, x: 0, y: 0, width: single.width, height: single.height, rotated: false },
+      ];
       pageWidth = Math.min(maxPageSize, width);
       pageHeight = Math.min(maxPageSize, height);
     }
 
     const placedIds = new Set(placed.map(box => box.id));
     pages.push({ width: pageWidth, height: pageHeight, boxes: placed });
+    remaining = remaining
+      .map(group => group.filter(input => !placedIds.has(input.id)))
+      .filter(group => group.length > 0);
 
-    const rest = remaining.filter(input => !placedIds.has(input.id));
-    if (rest.length === remaining.length) break;
-    remaining = rest;
+    // Safety net: a page that placed nothing would loop forever.
+    if (placed.length === 0 && remaining.length > 0) {
+      remaining = remaining.slice(1);
+    }
+  }
+}
+
+/**
+ * Pack every input, splitting into as many pages as needed.
+ * Inputs are sorted by area (descending) while packing and restored to the
+ * original order in the result, so exported metadata stays deterministic.
+ *
+ * With `framesPerGroup` the inputs are cut into animation groups and a group
+ * is never split across pages: an engine that binds a page to a texture can
+ * then play the animation without a texture swap.
+ */
+export function packRects(inputs: PackInput[], options: PackRectsOptions): PackedPage[] {
+  const { powerOfTwo, maxPageSize, allowRotation = false, framesPerGroup = 0 } = options;
+
+  if (inputs.length === 0) return [];
+
+  const oversized = inputs.filter(input => {
+    if (input.width <= maxPageSize && input.height <= maxPageSize) return false;
+    if (!allowRotation) return true;
+    return Math.max(input.width, input.height) > maxPageSize;
+  });
+  if (oversized.length > 0) {
+    throw new Error(
+      `Sprite #${oversized[0].id} (${oversized[0].width}x${oversized[0].height}) does not fit a ${maxPageSize}px page.`
+    );
+  }
+
+  const minWidth = inputs.reduce((max, input) => Math.max(max, input.width), 0);
+  const minHeight = inputs.reduce((max, input) => Math.max(max, input.height), 0);
+  const ascending = candidatePageSizes(minWidth, minHeight, maxPageSize, powerOfTwo);
+
+  const pages: PackedPage[] = [];
+
+  if (framesPerGroup > 0) {
+    // Groups keep the caller's order: an animation is a slice of the frame list.
+    const groups: PackInput[][] = [];
+    for (let i = 0; i < inputs.length; i += framesPerGroup) {
+      groups.push(inputs.slice(i, i + framesPerGroup));
+    }
+    packGroups(groups, ascending, maxPageSize, allowRotation, pages);
+  } else {
+    packGroups([sortByArea(inputs)], ascending, maxPageSize, allowRotation, pages);
   }
 
   // Restore the caller's ordering inside each page.

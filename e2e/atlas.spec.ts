@@ -3,21 +3,17 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import JSZip from 'jszip';
-import { createSheetPng, SHEET_CELLS } from './support/sheetPng';
-
-let sheetPath = '';
+import { createSheetPng, SHEET_CELLS, type SheetOptions } from './support/sheetPng';
 
 const readFile = (path: string) => readFileSync(path);
 
-test.beforeAll(() => {
+async function uploadSheet(page: Page, options: SheetOptions = {}): Promise<void> {
   const directory = mkdtempSync(join(tmpdir(), 'pixelslicer-e2e-'));
-  sheetPath = join(directory, 'sheet.png');
-  writeFileSync(sheetPath, createSheetPng());
-});
+  const path = join(directory, 'sheet.png');
+  writeFileSync(path, createSheetPng(options));
 
-async function uploadSheet(page: Page): Promise<void> {
   await page.goto('/');
-  await page.getByTestId('image-upload-input').setInputFiles(sheetPath);
+  await page.getByTestId('image-upload-input').setInputFiles(path);
   await expect(page.locator('.frame-item')).toHaveCount(SHEET_CELLS);
 }
 
@@ -94,4 +90,40 @@ test('exports the frame ZIP and the animation GIF from the worker', async ({ pag
 
   const header = (await readFile((await gif.path())!)).subarray(0, 6).toString('ascii');
   expect(header).toBe('GIF89a');
+});
+
+test('rotates, renames and groups without breaking the build', async ({ page }) => {
+  await uploadSheet(page);
+  await page.getByTestId('atlas-open').click();
+
+  await page.getByTestId('atlas-rotation').check();
+  await page.getByTestId('atlas-name-prefix').fill('hero_');
+  await page.getByTestId('atlas-name-start').fill('7');
+  // Group the eight frames as two animations of four.
+  await page.getByTestId('atlas-group-size').fill('4');
+
+  await page.getByTestId('atlas-build').click();
+  await expect(page.getByTestId('atlas-stats')).toBeVisible();
+  await expect(page.getByTestId('atlas-stats')).toContainText('8');
+
+  // The generated names follow the prefix and the start index.
+  await page.locator('.atlas__names summary').click();
+  await expect(page.getByTestId('atlas-name-0')).toHaveValue('hero_0007');
+  await expect(page.getByTestId('atlas-name-7')).toHaveValue('hero_0014');
+
+  // A manual rename survives the next build. The build button stays reachable
+  // because the preview header is sticky while the name list is scrolled.
+  await page.getByTestId('atlas-name-0').fill('hero_walk_01');
+  await page.getByTestId('atlas-build').click();
+  await expect(page.getByTestId('atlas-name-0')).toHaveValue('hero_walk_01');
+});
+
+test('warns about a fully transparent frame', async ({ page }) => {
+  await uploadSheet(page, { transparentCells: [3] });
+  await page.getByTestId('atlas-open').click();
+  await page.getByTestId('atlas-build').click();
+
+  const warnings = page.getByTestId('atlas-warnings');
+  await expect(warnings).toBeVisible();
+  await expect(warnings).toContainText('1x1 placeholder');
 });

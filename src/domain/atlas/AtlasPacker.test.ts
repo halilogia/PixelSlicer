@@ -214,6 +214,8 @@ describe('packRects', () => {
       powerOfTwo: false,
       maxPageSize: 256,
     });
-    expect(pages).toEqual([{ width: 1, height: 1, boxes: [{ id: 0, x: 0, y: 0, width: 1, height: 1 }] }]);
+    expect(pages).toEqual([
+      { width: 1, height: 1, boxes: [{ id: 0, x: 0, y: 0, width: 1, height: 1, rotated: false }] },
+    ]);
   });
 });

@@ -27,10 +27,11 @@ export function buildAtlasPages(
   source: AtlasSourceImage,
   frames: readonly Frame[],
   options: AtlasPackOptions,
-  pivots?: Record<number, Pivot>
+  pivots?: Record<number, Pivot>,
+  names?: readonly string[]
 ): { layout: AtlasLayout; pages: AtlasCanvas[] } {
   const buffer = readPixelBuffer(source);
-  const layout = buildAtlasLayout({ frames, options, buffer, pivots });
+  const layout = buildAtlasLayout({ frames, options, buffer, pivots, names });
 
   const pages = layout.pages.map(page => {
     const canvas = createAtlasCanvas(page.width, page.height);

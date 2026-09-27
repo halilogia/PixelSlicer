@@ -19,9 +19,9 @@ Atlas defaults (2px padding, 2px extrude, power of two, 4096px page limit).
 | `pack only` 100 frames | 0.059 | 0.063 | noise |
 | `measure + pack` 100 frames | 0.44 | 0.42 | noise |
 | `pack only` 500 frames | 0.41 | 0.28 | -32% |
-| `measure + pack` 500 frames | 7.88 | 2.12 | **-73%** |
-| `pack only` 1000 frames | 8.45 | 0.62 | **-93%** |
-| `measure + pack` 1000 frames | 11.54 | 4.36 | **-62%** |
+| `measure \+ pack` 500 frames | 7.88 | 2.62 | -67% |
+| `pack only` 1000 frames | 8.45 | 0.54 | **-94%** |
+| `measure \+ pack` 1000 frames | 11.54 | 5.71 | **-51%** |
 | `write the Phaser JSON` for 1000 sprites | 9.69 | 7.74 | noise |
 
 What moved and why:
@@ -30,6 +30,7 @@ What moved and why:
   several full MaxRects attempts that could not possibly fit. A cheap shelf estimate
   now runs first and returns the most square page that can hold everything, which is
   usually the very first candidate the old search reached anyway.
+- **Page filling fixed in v2.4**: when the content was larger than the page limit the search gave up and emitted one page per sprite. It now fills the largest allowed page with as many sprites (or whole animation groups) as fit.
 - **Memoized frame lists (`F-007`)**: reading `getFrames()` is constant time
   (0.0001 ms) instead of rebuilding a 1000 element array, which is what made React's
   dependency checks useless before. The cache key is the identity of the immutable

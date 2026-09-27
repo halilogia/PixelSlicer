@@ -3,12 +3,13 @@
 
 import React, { memo, useCallback } from 'react';
 import type { Frame } from '../domain/FrameLogic';
+import type { AtlasSourceImage } from '../infrastructure/atlas/AtlasRenderer';
 
 interface FrameThumbnailProps {
   frame: Frame;
   index: number;
   thumbnailUrl: string | undefined;
-  image: HTMLImageElement | HTMLCanvasElement | null;
+  image: AtlasSourceImage | null;
   isSelected: boolean;
   onToggle: (index: number) => void;
   onPreview: (index: number) => void;

@@ -23,6 +23,12 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  /* The build controls stay reachable while a long sprite list is scrolled. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 4px 0;
+  background: var(--bg-secondary);
 }
 
 .atlas__badge {
@@ -139,6 +145,74 @@
 .atlas__export:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.atlas__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.atlas__number {
+  width: 84px;
+  flex: 0 0 auto;
+}
+
+.atlas__pages {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.atlas__zoom {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.atlas__warnings {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(224, 175, 104, 0.5);
+  background: rgba(224, 175, 104, 0.08);
+  color: var(--accent-orange, #e0af68);
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.atlas__names summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 4px 0;
+}
+
+.atlas__name-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-top: 6px;
+}
+
+.atlas__name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas__name-page {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text-secondary);
+  width: 24px;
+  flex: 0 0 auto;
 }
 
 @media (max-width: 820px) {

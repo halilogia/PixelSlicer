@@ -71,7 +71,7 @@ describe('useEditorSelector', () => {
     expect(screen.getByTestId('playing').textContent).toBe('true');
   });
 
-  it('supports an object slice with a custom equality', () => {
+  it('supports an object slice with a custom equality', async () => {
     const model = modelWithImage();
 
     function Probe() {
@@ -83,14 +83,18 @@ describe('useEditorSelector', () => {
     expect(screen.getByTestId('bg').textContent).toBe('0,0,0,30');
 
     // A new object with identical values must not re-render.
-    act(() => model.setRemoveBgColor(0, 0, 0, 30));
+    await act(async () => {
+      await model.setRemoveBgColor(0, 0, 0, 30);
+    });
     expect(screen.getByTestId('bg').textContent).toBe('0,0,0,30');
 
-    act(() => model.setRemoveBgColor(10, 20, 30, 40));
+    await act(async () => {
+      await model.setRemoveBgColor(10, 20, 30, 40);
+    });
     expect(screen.getByTestId('bg').textContent).toBe('10,20,30,40');
   });
 
-  it('does not re-subscribe when the selector identity changes', () => {
+  it('does not re-subscribe when the selector identity changes', async () => {
     const model = modelWithImage();
     const subscribes: Array<() => void> = [];
     const original = model.subscribe.bind(model);
@@ -112,7 +116,9 @@ describe('useEditorSelector', () => {
     rerender(<Probe tag={2} />);
     expect(subscribes).toHaveLength(1);
 
-    act(() => model.setGridConfig({ cols: 2, rows: 1 }));
+    await act(async () => {
+      model.setGridConfig({ cols: 2, rows: 1 });
+    });
     expect(screen.getByTestId('count').textContent).toBe('2');
   });
 

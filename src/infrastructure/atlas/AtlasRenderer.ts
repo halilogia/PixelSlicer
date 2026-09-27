@@ -4,7 +4,7 @@
 
 import type { AtlasSprite, PixelBuffer } from '@domain/atlas/AtlasTypes';
 
-export type AtlasSourceImage = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
+export type AtlasSourceImage = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas;
 export type AtlasCanvas = OffscreenCanvas | HTMLCanvasElement;
 /** A finished atlas page: an OffscreenCanvas, a DOM canvas or a worker ImageBitmap. */
 export type AtlasPageImage = AtlasCanvas | ImageBitmap;

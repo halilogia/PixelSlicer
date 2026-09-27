@@ -10,6 +10,7 @@ export interface AtlasWorkerRequest {
   frames: Frame[];
   options: AtlasPackOptions;
   pivots?: Record<number, Pivot>;
+  names?: readonly string[];
 }
 
 export interface AtlasWorkerResponse {

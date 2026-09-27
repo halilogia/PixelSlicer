@@ -2,14 +2,16 @@
 // Packs the rendered pages plus every engine descriptor into a single ZIP.
 
 import JSZip from 'jszip';
-import type { AtlasFormat } from '@domain/atlas/AtlasTypes';
 import {
   buildGodotAtlasTextureResources,
   buildGodotJson,
   buildGodotSpriteFramesResource,
   buildPhaserArrayJson,
   buildPhaserJson,
+  buildStarlingJson,
+  buildStarlingXml,
   buildUnityJson,
+  buildUnityNativeAssets,
   UNITY_IMPORTER_CS,
   type AtlasExportInput,
 } from './AtlasMetadataExporters';
@@ -31,10 +33,15 @@ function metadataFileName(base: string, page: number, total: number): string {
   return total > 1 ? `${base}_${page}.json` : `${base}.json`;
 }
 
+export { ATLAS_FORMATS } from '@domain/atlas/AtlasTypes';
+export type { AtlasFormat } from '@domain/atlas/AtlasTypes';
+import type { AtlasFormat } from '@domain/atlas/AtlasTypes';
+
 const FORMAT_LABELS: Record<AtlasFormat, string> = {
   phaser: 'Phaser 3 (JSON Hash + JSON Array)',
   godot: 'Godot 4 (JSON + AtlasTexture .tres + SpriteFrames .tres)',
-  unity: 'Unity (JSON + editor importer scripts)',
+  unity: 'Unity (JSON + native .meta/.spriteatlas + editor importer scripts)',
+  starling: 'Starling (atlas.xml + JSON)',
 };
 
 function readme(input: AtlasBundleInput): string {
@@ -112,6 +119,17 @@ export function buildAtlasMetadataFiles(input: AtlasBundleInput): Array<{ path: 
         content: buildUnityJson(input, page),
       });
     }
+
+    if (input.formats.includes('starling')) {
+      files.push({
+        path: total > 1 ? `atlas_${page}.xml` : 'atlas.xml',
+        content: buildStarlingXml(input, page),
+      });
+      files.push({
+        path: metadataFileName('starling', page, total),
+        content: buildStarlingJson(input, page),
+      });
+    }
   }
 
   if (input.formats.includes('godot')) {
@@ -123,6 +141,7 @@ export function buildAtlasMetadataFiles(input: AtlasBundleInput): Array<{ path: 
   }
 
   if (input.formats.includes('unity')) {
+    files.push(...buildUnityNativeAssets(input));
     files.push({ path: 'Unity/PixelSlicerAtlas.cs', content: UNITY_IMPORTER_CS });
   }
 

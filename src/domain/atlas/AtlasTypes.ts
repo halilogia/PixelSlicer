@@ -66,6 +66,8 @@ export interface AtlasSprite extends MeasuredSprite {
   atlas: Rect;
   /** Full occupied box (content + padding + extrude ring). */
   box: Rect;
+  /** True when the sprite is stored rotated by 90 degrees. */
+  rotated: boolean;
 }
 
 export interface AtlasLayout {
@@ -75,6 +77,8 @@ export interface AtlasLayout {
   occupancy: number;
   /** Pixels saved by trimming compared to a naive 1:1 copy. */
   savedPixels: number;
+  /** Empty, duplicated and oversized frames worth telling the user about. */
+  warnings: AtlasWarning[];
 }
 
 export interface AtlasPackOptions {
@@ -92,6 +96,17 @@ export interface AtlasPackOptions {
   alphaThreshold: number;
   pivotMode: PivotMode;
   customPivot: Pivot | null;
+  /** Allow 90° rotated sprites, which packs tighter but needs engine support. */
+  allowRotation: boolean;
+  /**
+   * Frames per animation. Groups are kept on a single page so engines never
+   * swap textures mid animation. 0 packs freely.
+   */
+  framesPerGroup: number;
+  /** Name of the first sprite; the rest are numbered from there. */
+  namePrefix: string;
+  /** Index of the first sprite, used with `namePrefix`. */
+  nameStartIndex: number;
 }
 
 export const DEFAULT_ATLAS_PACK_OPTIONS: AtlasPackOptions = {
@@ -103,8 +118,20 @@ export const DEFAULT_ATLAS_PACK_OPTIONS: AtlasPackOptions = {
   alphaThreshold: 0,
   pivotMode: 'center',
   customPivot: null,
+  allowRotation: false,
+  framesPerGroup: 0,
+  namePrefix: 'frame_',
+  nameStartIndex: 1,
 };
 
-export const ATLAS_FORMATS = ['phaser', 'godot', 'unity'] as const;
+/** A frame that carries no content at all. */
+export interface AtlasWarning {
+  kind: 'empty' | 'duplicate' | 'oversized';
+  frameIndex: number;
+  name: string;
+  message: string;
+}
+
+export const ATLAS_FORMATS = ['phaser', 'godot', 'unity', 'starling'] as const;
 
 export type AtlasFormat = (typeof ATLAS_FORMATS)[number];

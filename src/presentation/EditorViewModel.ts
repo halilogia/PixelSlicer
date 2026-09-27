@@ -12,13 +12,15 @@ import {
 } from '@domain/FrameLogic';
 import type { Pivot, PivotMode } from '@domain/atlas/AtlasTypes';
 import { normalizePivot } from '@domain/atlas/AtlasPivot';
+import { removeBackgroundColor } from '@infrastructure/BackgroundRemoval';
+import type { AtlasSourceImage } from '@infrastructure/atlas/AtlasRenderer';
 
 export type StateListener = () => void;
 
 export interface EditorState {
   // Image
   image: HTMLImageElement | null;
-  processedImage: HTMLCanvasElement | HTMLImageElement | null;
+  processedImage: AtlasSourceImage | null;
   imageDimensions: ImageDimensions | null;
   isImageLoaded: boolean;
   
@@ -133,6 +135,8 @@ export class EditorViewModel {
     manual: readonly Frame[];
     manualMode: boolean;
   } | null = null;
+  /** Guards the asynchronous background removal against out of order results. */
+  private processedToken = 0;
 
   constructor() {
     // Fresh array instances: the defaults are shared module state and
@@ -190,7 +194,7 @@ export class EditorViewModel {
       height: image.naturalHeight,
     };
     this.state.isImageLoaded = true;
-    this.updateProcessedImage();
+    void this.updateProcessedImage();
     this.recalculateFrames();
     this.notify();
   }
@@ -501,59 +505,52 @@ export class EditorViewModel {
   }
   
   // Effects settings
-  toggleRemoveBackground(): void {
+  toggleRemoveBackground(): Promise<void> {
     this.state.removeBackground = !this.state.removeBackground;
-    this.updateProcessedImage();
     this.notify();
-  }
-  
-  setRemoveBgColor(r: number, g: number, b: number, tolerance: number): void {
-    this.state.removeBgColor = { r, g, b, tolerance };
-    if (this.state.removeBackground) {
-      this.updateProcessedImage();
-    }
-    this.notify();
+    // Awaitable so callers and tests can wait for the worker round trip.
+    return this.updateProcessedImage();
   }
 
-  private updateProcessedImage(): void {
+  setRemoveBgColor(r: number, g: number, b: number, tolerance: number): Promise<void> {
+    this.state.removeBgColor = { r, g, b, tolerance };
+    if (!this.state.removeBackground) {
+      // The colour is also used by the eyedropper preview, so it is published.
+      this.notify();
+      return Promise.resolve();
+    }
+    return this.updateProcessedImage();
+  }
+
+  /**
+   * Rebuild the processed image. The pixel walk is handed to a worker when
+   * OffscreenCanvas is available, so a huge sheet does not freeze the editor.
+   */
+  private async updateProcessedImage(): Promise<void> {
     if (!this.state.image || !this.state.imageDimensions) return;
+
+    // The pixel walk is asynchronous, so a slow run must never overwrite the
+    // result of a newer one.
+    const token = ++this.processedToken;
 
     if (!this.state.removeBackground) {
       this.state.processedImage = this.state.image;
+      this.notify();
       return;
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = this.state.imageDimensions.width;
-    canvas.height = this.state.imageDimensions.height;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    
-    if (!ctx) {
+    const { r, g, b, tolerance } = this.state.removeBgColor;
+
+    try {
+      const result = await removeBackgroundColor(this.state.image, r, g, b, tolerance);
+      if (token !== this.processedToken) return;
+      this.state.processedImage = result;
+    } catch (error) {
+      if (token !== this.processedToken) return;
+      console.error('Background removal failed:', error);
       this.state.processedImage = this.state.image;
-      return;
     }
-
-    ctx.drawImage(this.state.image, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    const { r: targetR, g: targetG, b: targetB, tolerance } = this.state.removeBgColor;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      const diffR = Math.abs(r - targetR);
-      const diffG = Math.abs(g - targetG);
-      const diffB = Math.abs(b - targetB);
-
-      if (diffR <= tolerance && diffG <= tolerance && diffB <= tolerance) {
-        data[i + 3] = 0; // Set alpha to 0 (transparent)
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    this.state.processedImage = canvas;
+    this.notify();
   }
   
   // Drawing state management
