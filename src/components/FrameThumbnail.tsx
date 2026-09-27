@@ -58,7 +58,7 @@ const FrameThumbnail: React.FC<FrameThumbnailProps> = ({
     onDownload(index);
   }, [index, onDownload]);
 
-  // Fallback to inline canvas if thumbnail not ready
+  // Fallback to a shimmer while the thumbnail is being generated
   const renderImage = () => {
     if (thumbnailUrl) {
       return (
@@ -72,22 +72,11 @@ const FrameThumbnail: React.FC<FrameThumbnailProps> = ({
       );
     }
 
-    // Placeholder while thumbnail generates
+    // Shimmer placeholder: the gallery is never blank while the idle batches run
     return (
-      <div 
-        className="frame-item__placeholder"
-        style={{
-          width: '100%',
-          height: '100%',
-          backgroundColor: '#1f2335',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#565f89',
-          fontSize: '12px',
-        }}
-      >
-        {index + 1}
+      <div className="frame-item__placeholder" aria-label={`Frame ${index + 1} loading`}>
+        <span className="frame-item__placeholder-index">{index + 1}</span>
+        <span className="frame-item__placeholder-shimmer" />
       </div>
     );
   };

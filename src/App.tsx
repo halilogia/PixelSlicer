@@ -34,6 +34,7 @@ function App() {
 
   const { language, changeLanguage, t } = useI18n();
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const videoAnimationRef = useRef<number | null>(null);
@@ -184,7 +185,9 @@ function App() {
     };
   }, [state.isManualMode, state.isDrawing]);
 
-  // Draw main canvas when state changes
+  // Draw the image layer: the sheet and every frame decoration.
+  // Deliberately free of the drawing/selection *transient* state so the
+  // marching ants animation never repaints the image or 1000 frame borders.
   useEffect(() => {
     const canvas = mainCanvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -196,22 +199,13 @@ function App() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.scale(state.zoom, state.zoom);
-    
+
     // Draw image
     if (state.processedImage) {
       ctx.drawImage(state.processedImage, 0, 0);
     } else {
       ctx.drawImage(state.image, 0, 0);
     }
-    
-    // Get drawing state for real-time feedback from state
-    const drawingState = state.isDrawing ? {
-      isDrawing: state.isDrawing,
-      startX: state.drawStartX,
-      startY: state.drawStartY,
-      currentX: state.drawCurrentX,
-      currentY: state.drawCurrentY,
-    } : null;
 
     // Canvas state changes are expensive: only touch a property when the value
     // actually changes, otherwise every frame in the grid re-applies the same
@@ -248,45 +242,11 @@ function App() {
       // When manual mode is on, completely hide automatic selection frames
       const isManual = index >= state.frames.length;
       if (state.isManualMode && !isManual) return;
-      
+
       const manualFrameIndex = index - state.frames.length;
       const isSelected = isManual && manualFrameIndex === state.selectedManualFrameIndex;
-      const isBeingDrawn = isManual && drawingState && manualFrameIndex === state.manualFrames.length - 1;
-      
-      if (isBeingDrawn && drawingState) {
-        // Draw marching ants / dashed border for selection in progress
-        const drawX = Math.min(drawingState.startX, drawingState.currentX);
-        const drawY = Math.min(drawingState.startY, drawingState.currentY);
-        const drawW = Math.abs(drawingState.currentX - drawingState.startX);
-        const drawH = Math.abs(drawingState.currentY - drawingState.startY);
-        
-        if (drawW > 0 && drawH > 0) {
-          // Semi-transparent overlay
-          useFill('rgba(122, 162, 247, 0.15)');
-          ctx.fillRect(drawX, drawY, drawW, drawH);
-          
-          // Marching ants border
-          useStroke('#7aa2f7');
-          useLineWidth(2);
-          ctx.setLineDash([6, 4]);
-          ctx.lineDashOffset = -marchingAntsOffset;
-          ctx.strokeRect(drawX, drawY, drawW, drawH);
-          ctx.setLineDash([]);
-          ctx.lineDashOffset = 0;
-          
-          // Dynamic border trail - corners
-          useFill('#7aa2f7');
-          const handleSize = 8;
-          // Top-left
-          ctx.fillRect(drawX - handleSize/2, drawY - handleSize/2, handleSize, handleSize);
-          // Top-right
-          ctx.fillRect(drawX + drawW - handleSize/2, drawY - handleSize/2, handleSize, handleSize);
-          // Bottom-left
-          ctx.fillRect(drawX - handleSize/2, drawY + drawH - handleSize/2, handleSize, handleSize);
-          // Bottom-right
-          ctx.fillRect(drawX + drawW - handleSize/2, drawY + drawH - handleSize/2, handleSize, handleSize);
-        }
-      } else {
+
+      {
         // Frame border - active: blue, inactive: red
         useStroke(isSelected ? '#bb9af7' : frame.isActive ? '#7aa2f7' : '#f43f5e');
         useLineWidth(isSelected ? 3 : frame.isActive ? 2 : 3);
@@ -384,7 +344,61 @@ function App() {
     });
     
     ctx.restore();
-  }, [state.image, state.imageDimensions, state.frames, state.manualFrames, state.zoom, state.selectedManualFrameIndex, state.currentFrame, state.isManualMode, state.isDrawing, state.drawStartX, state.drawStartY, state.drawCurrentX, state.drawCurrentY, state.isPivotPicking, marchingAntsOffset]);
+  }, [state.image, state.processedImage, state.imageDimensions, state.frames, state.manualFrames, state.zoom, state.selectedManualFrameIndex, state.isManualMode, state.isPivotPicking]);
+
+  // Draw the interaction overlay: the marching ants of a frame being drawn.
+  // Separate from the image layer so a 50ms animation tick costs a few
+  // rectangles instead of a full repaint of the sheet.
+  useEffect(() => {
+    const canvas = overlayCanvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+
+    if (!state.imageDimensions) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
+    canvas.width = state.imageDimensions.width * state.zoom;
+    canvas.height = state.imageDimensions.height * state.zoom;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!state.isDrawing) return;
+
+    ctx.save();
+    ctx.scale(state.zoom, state.zoom);
+
+    const drawX = Math.min(state.drawStartX, state.drawCurrentX);
+    const drawY = Math.min(state.drawStartY, state.drawCurrentY);
+    const drawW = Math.abs(state.drawCurrentX - state.drawStartX);
+    const drawH = Math.abs(state.drawCurrentY - state.drawStartY);
+    if (drawW <= 0 || drawH <= 0) {
+      ctx.restore();
+      return;
+    }
+
+    // Semi-transparent overlay
+    ctx.fillStyle = 'rgba(122, 162, 247, 0.15)';
+    ctx.fillRect(drawX, drawY, drawW, drawH);
+
+    // Marching ants border
+    ctx.strokeStyle = '#7aa2f7';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.lineDashOffset = -marchingAntsOffset;
+    ctx.strokeRect(drawX, drawY, drawW, drawH);
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
+    // Dynamic border trail - corners
+    ctx.fillStyle = '#7aa2f7';
+    const handleSize = 8;
+    ctx.fillRect(drawX - handleSize / 2, drawY - handleSize / 2, handleSize, handleSize);
+    ctx.fillRect(drawX + drawW - handleSize / 2, drawY - handleSize / 2, handleSize, handleSize);
+    ctx.fillRect(drawX - handleSize / 2, drawY + drawH - handleSize / 2, handleSize, handleSize);
+    ctx.fillRect(drawX + drawW - handleSize / 2, drawY + drawH - handleSize / 2, handleSize, handleSize);
+
+    ctx.restore();
+  }, [state.imageDimensions, state.zoom, state.isDrawing, state.drawStartX, state.drawStartY, state.drawCurrentX, state.drawCurrentY, marchingAntsOffset]);
 
   // Draw preview canvas
   useEffect(() => {
@@ -1251,6 +1265,7 @@ function App() {
               </div>
             )}
             <canvas
+              className="canvas__layer canvas__layer--image"
               ref={mainCanvasRef}
               onClick={handleCanvasClick}
               onMouseDown={handleCanvasMouseDown}
@@ -1258,6 +1273,11 @@ function App() {
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseLeave}
               style={{ cursor: isEyedropperActive ? 'cell' : state.isManualMode || state.isPivotPicking ? 'crosshair' : 'default' }}
+            ></canvas>
+            <canvas
+              className="canvas__layer canvas__layer--overlay"
+              ref={overlayCanvasRef}
+              aria-hidden="true"
             ></canvas>
           </div>
         </main>

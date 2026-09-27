@@ -17,6 +17,14 @@ const DEFAULT_OPTIONS: Required<ThumbnailOptions> = {
   format: 'image/jpeg',
 };
 
+type ThumbnailResult = [index: number, url: string] | null;
+
+function revoke(url: string | undefined): void {
+  if (url && url.startsWith('blob:')) {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function useFrameThumbnails(
   image: HTMLImageElement | HTMLCanvasElement | null,
   frames: readonly Frame[],
@@ -24,56 +32,71 @@ export function useFrameThumbnails(
 ): Map<number, string> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const [thumbnails, setThumbnails] = useState<Map<number, string>>(new Map());
-  
+
   // Refs for version tracking
   const frameVersionsRef = useRef<Map<number, number>>(new Map());
   const pendingUpdateRef = useRef<number | null>(null);
   const lastImageRef = useRef<HTMLImageElement | HTMLCanvasElement | null>(null);
 
-  // Generate thumbnail for single frame - creates fresh canvas to avoid resize issues
-  const generateThumbnail = useCallback((
-    frame: Frame
-  ): string => {
-    const scale = Math.min(
-      opts.maxSize / frame.w,
-      opts.maxSize / frame.h,
-      1
-    );
-    
-    const width = Math.max(1, Math.floor(frame.w * scale));
-    const height = Math.max(1, Math.floor(frame.h * scale));
-    
-    // Create fresh canvas for each thumbnail to avoid resize clearing issues
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Could not get canvas context');
-    }
-    
-    // Draw image directly (no need to clear on fresh canvas)
-    ctx.drawImage(
-      image!,
-      frame.x, frame.y, frame.w, frame.h,
-      0, 0, width, height
-    );
-    
-    return canvas.toDataURL(opts.format, opts.quality);
-  }, [image, opts.format, opts.quality, opts.maxSize]);
+  /**
+   * Draw one frame and hand back an object URL.
+   *
+   * `toBlob()` is asynchronous, so the encoding never blocks the main thread,
+   * and the result is a binary blob instead of a base64 data URL: ~33% less
+   * memory and no giant string to keep alive in React state.
+   */
+  const generateThumbnail = useCallback(
+    (frame: Frame): Promise<string> => {
+      const scale = Math.min(opts.maxSize / frame.w, opts.maxSize / frame.h, 1);
+      const width = Math.max(1, Math.floor(frame.w * scale));
+      const height = Math.max(1, Math.floor(frame.h * scale));
+
+      // A fresh canvas per frame: the bitmap is captured asynchronously by
+      // toBlob(), so a shared canvas could be resized before the read happens.
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return Promise.reject(new Error('Could not get canvas context'));
+      }
+
+      ctx.drawImage(
+        image!,
+        frame.x, frame.y, frame.w, frame.h,
+        0, 0, width, height
+      );
+
+      return new Promise<string>((resolve, reject) => {
+        canvas.toBlob(
+          blob => {
+            if (!blob) {
+              reject(new Error('Could not encode the thumbnail'));
+              return;
+            }
+            resolve(URL.createObjectURL(blob));
+          },
+          opts.format,
+          opts.quality
+        );
+      });
+    },
+    [image, opts.format, opts.quality, opts.maxSize]
+  );
 
   // Batch thumbnail generation using scheduleTask (requestIdleCallback with Safari fallback)
   // Using ref for thumbnails to avoid circular dependency
   const thumbnailsRef = useRef(thumbnails);
   thumbnailsRef.current = thumbnails;
-  
+
   useEffect(() => {
     // RESET CACHE ON IMAGE CHANGE
     // If the image reference changes, we must invalidate all thumbnails
     // because frame dimensions might be identical but the content is different
     if (lastImageRef.current !== image) {
       if (thumbnailsRef.current.size > 0) {
+        thumbnailsRef.current.forEach(revoke);
         setThumbnails(new Map());
         frameVersionsRef.current = new Map();
       }
@@ -83,6 +106,7 @@ export function useFrameThumbnails(
 
     if (!image || frames.length === 0) {
       if (thumbnailsRef.current.size > 0) {
+        thumbnailsRef.current.forEach(revoke);
         setThumbnails(new Map());
         frameVersionsRef.current = new Map();
       }
@@ -97,18 +121,18 @@ export function useFrameThumbnails(
     // Check if we need to update any thumbnails
     let needsUpdate = false;
     const currentVersions = frameVersionsRef.current;
-    
+
     for (let i = 0; i < frames.length; i++) {
       const frame = frames[i];
       const currentVersion = frame.x + frame.y + frame.w + frame.h + (frame.isActive ? 1 : 0);
       const cachedVersion = currentVersions.get(i);
-      
+
       if (cachedVersion !== currentVersion || !thumbnailsRef.current.has(i)) {
         needsUpdate = true;
         break;
       }
     }
-    
+
     // Check for removed frames
     if (!needsUpdate) {
       for (const key of thumbnailsRef.current.keys()) {
@@ -118,64 +142,82 @@ export function useFrameThumbnails(
         }
       }
     }
-    
+
     if (!needsUpdate) return;
 
     // Batch thumbnail generation using scheduleTask (requestIdleCallback with Safari fallback)
     const processBatch = (startIndex: number) => {
-      pendingUpdateRef.current = scheduleTask((deadline) => {
+      pendingUpdateRef.current = scheduleTask(deadline => {
         let currentIndex = startIndex;
-        const batchThumbnails = new Map<number, string>();
         const batchVersions = new Map<number, number>();
+        const encoding: Array<Promise<ThumbnailResult>> = [];
         let processedInThisBatch = 0;
 
-        // Inner loop to process as many frames as possible in this idle period
+        // The draw call is the synchronous part and respects the idle budget;
+        // the encoding runs in parallel behind it.
         while (currentIndex < frames.length && (deadline.timeRemaining() > 0 || processedInThisBatch === 0)) {
           const frame = frames[currentIndex];
-          
+
           // Basic validation to avoid DOM errors
           if (frame.w > 0 && frame.h > 0) {
             const currentVersion = frame.x + frame.y + frame.w + frame.h + (frame.isActive ? 1 : 0);
             const cachedVersion = frameVersionsRef.current.get(currentIndex);
-            
+
             // Generate if changed or missing
             if (cachedVersion !== currentVersion || !thumbnailsRef.current.has(currentIndex)) {
-              try {
-                const thumbnailUrl = generateThumbnail(frame);
-                batchThumbnails.set(currentIndex, thumbnailUrl);
-                batchVersions.set(currentIndex, currentVersion);
-                processedInThisBatch++;
-              } catch (err) {
-                console.error('Failed to generate thumbnail for frame', currentIndex, err);
-              }
+              const index = currentIndex;
+              batchVersions.set(index, currentVersion);
+              encoding.push(
+                generateThumbnail(frame)
+                  .then(url => [index, url] as [number, string])
+                  .catch(err => {
+                    console.error('Failed to generate thumbnail for frame', index, err);
+                    return null;
+                  })
+              );
+              processedInThisBatch++;
             }
           }
-          
+
           currentIndex++;
         }
 
-        // UPDATE STATE ONCE PER IDLE PERIOD
-        if (processedInThisBatch > 0) {
-          setThumbnails(prev => {
-            const next = new Map(prev);
-            batchThumbnails.forEach((url, idx) => next.set(idx, url));
-            return next;
-          });
-          
-          // Update versions ref alongside state
-          batchVersions.forEach((ver, idx) => frameVersionsRef.current.set(idx, ver));
-        }
+        void Promise.all(encoding).then(settled => {
+          // The sheet changed while we were encoding: those blobs are useless.
+          if (lastImageRef.current !== image) {
+            settled.forEach(result => result && revoke(result[1]));
+            return;
+          }
 
-        if (currentIndex < frames.length) {
-          // More frames to process, schedule NEXT idle period
-          processBatch(currentIndex);
-        } else {
-          // All done, clean up removed frames if necessary
+          const ready = settled.filter((result): result is [number, string] => result !== null);
+
+          if (ready.length > 0) {
+            // UPDATE STATE ONCE PER IDLE PERIOD
+            setThumbnails(prev => {
+              const next = new Map(prev);
+              ready.forEach(([index, url]) => {
+                revoke(next.get(index));
+                next.set(index, url);
+              });
+              return next;
+            });
+
+            ready.forEach(([index]) => frameVersionsRef.current.set(index, batchVersions.get(index)!));
+          }
+
+          if (currentIndex < frames.length) {
+            // More frames to process, schedule NEXT idle period
+            processBatch(currentIndex);
+            return;
+          }
+
+          // All done, clean up removed frames
           setThumbnails(prev => {
             let hasRemoved = false;
             const next = new Map(prev);
             for (const key of next.keys()) {
               if (key >= frames.length) {
+                revoke(next.get(key));
                 next.delete(key);
                 frameVersionsRef.current.delete(key);
                 hasRemoved = true;
@@ -184,7 +226,7 @@ export function useFrameThumbnails(
             return hasRemoved ? next : prev;
           });
           pendingUpdateRef.current = null;
-        }
+        });
       }, { timeout: 100 });
     };
 
@@ -201,78 +243,9 @@ export function useFrameThumbnails(
   useEffect(() => {
     return () => {
       // Revoke object URLs to prevent memory leaks
-      thumbnails.forEach((url) => {
-        if (url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
+      thumbnails.forEach(revoke);
     };
   }, []);
 
   return thumbnails;
-}
-
-// Hook for single thumbnail (simpler version for specific use cases)
-export function useSingleThumbnail(
-  image: HTMLImageElement | null,
-  frame: Frame | null,
-  options: ThumbnailOptions = {}
-): string | null {
-  const [thumbnail, setThumbnail] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const lastFrameRef = useRef<Frame | null>(null);
-
-  useEffect(() => {
-    if (!image || !frame) {
-      setThumbnail(null);
-      return;
-    }
-
-    // Check if frame actually changed
-    if (lastFrameRef.current &&
-        lastFrameRef.current.x === frame.x &&
-        lastFrameRef.current.y === frame.y &&
-        lastFrameRef.current.w === frame.w &&
-        lastFrameRef.current.h === frame.h &&
-        thumbnail) {
-      return;
-    }
-
-    const opts = { ...DEFAULT_OPTIONS, ...options };
-    
-    if (!canvasRef.current) {
-      canvasRef.current = document.createElement('canvas');
-    }
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
-
-    const scale = Math.min(
-      opts.maxSize / frame.w,
-      opts.maxSize / frame.h,
-      1
-    );
-    
-    canvas.width = Math.max(1, Math.floor(frame.w * scale));
-    canvas.height = Math.max(1, Math.floor(frame.h * scale));
-
-    ctx.drawImage(
-      image,
-      frame.x, frame.y, frame.w, frame.h,
-      0, 0, canvas.width, canvas.height
-    );
-
-    const newThumbnail = canvas.toDataURL(opts.format, opts.quality);
-    setThumbnail(newThumbnail);
-    lastFrameRef.current = frame;
-
-    return () => {
-      if (newThumbnail.startsWith('blob:')) {
-        URL.revokeObjectURL(newThumbnail);
-      }
-    };
-  }, [image, frame, options, thumbnail]);
-
-  return thumbnail;
 }
