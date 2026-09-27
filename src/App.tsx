@@ -3,8 +3,11 @@ import { EditorViewModel } from './presentation/EditorViewModel';
 import { exportAsZip, exportAsSpriteSheet, exportAsGif, downloadBlob } from './infrastructure/ExportService';
 import { decodeGif } from './infrastructure/GifService';
 import type { GridConfig } from './domain/FrameLogic';
+import { PIVOT_MODE_LABELS, pivotFromPoint } from './domain/atlas/AtlasPivot';
+import { PIVOT_MODES, type PivotMode } from './domain/atlas/AtlasTypes';
 import { useI18n } from './i18n/useI18n';
 import GallerySection from './components/GallerySection';
+import { AtlasExporterModal } from './presentation/components/AtlasExporter';
 import { VideoUploader } from './presentation/components/VideoUploader';
 import type { VideoFile } from './domain/video/Video';
 import { videoFrameExtractor, ExtractedFrame } from './infrastructure/video/VideoFrameExtractor';
@@ -13,6 +16,7 @@ import { VideoProcessingConfig, DEFAULT_VIDEO_CONFIG } from './domain/video/Vide
 import logoImg from './assets/logo2.png';
 import './styles/main.css';
 import './styles/video-uploader.css';
+import './styles/atlas.css';
 
 // Initialize ViewModel
 const viewModel = new EditorViewModel();
@@ -21,6 +25,7 @@ function App() {
   const [state, setState] = useState(viewModel.getState());
   const [showSettings, setShowSettings] = useState(false);
   const [showVideoUploader, setShowVideoUploader] = useState(false);
+  const [showAtlas, setShowAtlas] = useState(false);
   const [isEyedropperActive, setIsEyedropperActive] = useState(false);
   const [videoFrames, setVideoFrames] = useState<ExtractedFrame[]>([]);
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
@@ -326,10 +331,30 @@ function App() {
           ctx.fillText(String(frame.index + 1), frame.x + 4, frame.y + (isSelected ? 18 : 14));
         }
       }
+
+      // Pivot crosshair for frames with a manually picked origin
+      if (frame.pivot) {
+        const pivotX = frame.x + frame.pivot.x * frame.w;
+        const pivotY = frame.y + frame.pivot.y * frame.h;
+        const arm = 8;
+
+        ctx.strokeStyle = '#e0af68';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(pivotX - arm, pivotY);
+        ctx.lineTo(pivotX + arm, pivotY);
+        ctx.moveTo(pivotX, pivotY - arm);
+        ctx.lineTo(pivotX, pivotY + arm);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(pivotX, pivotY, 3.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     });
     
     ctx.restore();
-  }, [state.image, state.imageDimensions, state.frames, state.manualFrames, state.zoom, state.selectedManualFrameIndex, state.currentFrame, state.isManualMode, state.isDrawing, state.drawStartX, state.drawStartY, state.drawCurrentX, state.drawCurrentY, marchingAntsOffset]);
+  }, [state.image, state.imageDimensions, state.frames, state.manualFrames, state.zoom, state.selectedManualFrameIndex, state.currentFrame, state.isManualMode, state.isDrawing, state.drawStartX, state.drawStartY, state.drawCurrentX, state.drawCurrentY, state.isPivotPicking, marchingAntsOffset]);
 
   // Draw preview canvas
   useEffect(() => {
@@ -568,6 +593,22 @@ function App() {
       return;
     }
 
+    // Pivot picking: store the origin of the clicked frame
+    if (state.isPivotPicking) {
+      const allFrames = viewModel.getFrames();
+      for (let i = allFrames.length - 1; i >= 0; i--) {
+        const f = allFrames[i];
+        if (pos.x >= f.x && pos.x <= f.x + f.w && pos.y >= f.y && pos.y <= f.y + f.h) {
+          viewModel.setFramePivot(
+            i,
+            pivotFromPoint({ x: f.x, y: f.y, width: f.w, height: f.h }, pos)
+          );
+          return;
+        }
+      }
+      return;
+    }
+
     if (state.isManualMode) return;
     
     // Toggle frame logic
@@ -579,11 +620,14 @@ function App() {
         return;
       }
     }
-  }, [state.imageDimensions, state.isManualMode, isEyedropperActive, state.image, state.removeBgColor.tolerance]);
+  }, [state.imageDimensions, state.isManualMode, isEyedropperActive, state.image, state.removeBgColor.tolerance, state.isPivotPicking]);
 
   // Canvas mouse handlers for manual mode
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!state.isManualMode || !state.imageDimensions) return;
+
+    // While picking pivots, clicks belong to handleCanvasClick only.
+    if (state.isPivotPicking) return;
     
     const canvas = mainCanvasRef.current;
     if (!canvas) return;
@@ -634,7 +678,7 @@ function App() {
     
     // Start drawing new frame
     viewModel.startDrawing(pos.x, pos.y);
-  }, [state.isManualMode, state.imageDimensions, state.frames.length]);
+  }, [state.isManualMode, state.imageDimensions, state.frames.length, state.isPivotPicking]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!state.isManualMode || !state.imageDimensions) return;
@@ -1013,6 +1057,87 @@ function App() {
             )}
           </div>
 
+          {/* Atlas Packer & Pivot */}
+          <div className="sidebar__section">
+            <h3 className="sidebar__title">
+              <i className="fa-solid fa-cubes" style={{ color: '#bb9af7' }}></i> {t('atlasPacker')}
+            </h3>
+
+            <div className="form-group">
+              <label className="form-label">{t('pivotMode')}</label>
+              <select
+                className="form-input"
+                value={state.pivotMode}
+                onChange={(e) => viewModel.setPivotMode(e.target.value as PivotMode)}
+              >
+                {PIVOT_MODES.filter(mode => mode !== 'custom').map(mode => (
+                  <option key={mode} value={mode}>
+                    {PIVOT_MODE_LABELS[mode]}
+                  </option>
+                ))}
+                <option value="custom">{PIVOT_MODE_LABELS.custom}</option>
+              </select>
+            </div>
+
+            <button
+              className={`btn ${state.isPivotPicking ? 'btn--active' : 'btn--secondary'}`}
+              style={{ width: '100%' }}
+              onClick={() => viewModel.togglePivotPicking()}
+              title={t('pivotPickHint')}
+            >
+              <i className="fa-solid fa-crosshairs"></i>{' '}
+              {state.isPivotPicking ? t('pivotPickingOn') : t('pivotPick')}
+            </button>
+
+            {viewModel.getPickedPivotCount() > 0 && (
+              <button
+                className="btn btn--secondary"
+                style={{ width: '100%', marginTop: '8px' }}
+                onClick={() => viewModel.clearFramePivots()}
+              >
+                <i className="fa-solid fa-rotate-left"></i> {t('pivotClear')} (
+                {viewModel.getPickedPivotCount()})
+              </button>
+            )}
+
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={state.atlasTrim}
+                  onChange={(e) => viewModel.setAtlasTrim(e.target.checked)}
+                  style={{ marginRight: '8px' }}
+                />
+                {t('atlasAutoTrim')}
+              </label>
+            </div>
+
+            {state.atlasTrim && (
+              <div className="form-group">
+                <div className="range-label">
+                  <span>{t('atlasAlphaThreshold')}</span>
+                  <span className="range-value">{state.atlasAlphaThreshold}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={255}
+                  value={state.atlasAlphaThreshold}
+                  onChange={(e) => viewModel.setAtlasAlphaThreshold(parseInt(e.target.value))}
+                />
+              </div>
+            )}
+
+            <button
+              className="btn btn--primary"
+              style={{ width: '100%', marginTop: '8px', backgroundColor: '#bb9af7', color: '#1a1b26' }}
+              onClick={() => setShowAtlas(true)}
+              disabled={!state.image}
+            >
+              <i className="fa-solid fa-layer-group"></i> {t('atlasOpen')}
+            </button>
+          </div>
+
           {/* Export Options */}
           <div className="sidebar__section">
             <div className="form-group">
@@ -1117,7 +1242,7 @@ function App() {
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseLeave}
-              style={{ cursor: isEyedropperActive ? 'cell' : state.isManualMode ? 'crosshair' : 'default' }}
+              style={{ cursor: isEyedropperActive ? 'cell' : state.isManualMode || state.isPivotPicking ? 'crosshair' : 'default' }}
             ></canvas>
           </div>
         </main>
@@ -1178,8 +1303,7 @@ function App() {
       )}
 
       {/* Video Uploader Modal */}
-      {showVideoUploader && (
-        <div className="modal-overlay" onClick={() => setShowVideoUploader(false)}>
+      {showVideoUploader && (        <div className="modal-overlay" onClick={() => setShowVideoUploader(false)}>
           <div className="modal modal--large" onClick={(e) => e.stopPropagation()}>
             <div className="modal__header">
               <h3 className="modal__title">
@@ -1197,6 +1321,21 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Atlas Packer Modal */}
+      {showAtlas && state.image && (
+        <AtlasExporterModal
+          image={state.processedImage || state.image}
+          frames={viewModel.getActiveFrames()}
+          pivotMode={state.pivotMode}
+          trim={state.atlasTrim}
+          alphaThreshold={state.atlasAlphaThreshold}
+          fps={state.fps}
+          onTrimChange={(enabled) => viewModel.setAtlasTrim(enabled)}
+          onAlphaThresholdChange={(value) => viewModel.setAtlasAlphaThreshold(value)}
+          onClose={() => setShowAtlas(false)}
+        />
       )}
     </div>
   );

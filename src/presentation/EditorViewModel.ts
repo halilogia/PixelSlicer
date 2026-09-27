@@ -10,6 +10,8 @@ import {
   resizeFrame,
   getResizeHandleAt,
 } from '@domain/FrameLogic';
+import type { Pivot, PivotMode } from '@domain/atlas/AtlasTypes';
+import { normalizePivot } from '@domain/atlas/AtlasPivot';
 
 export type StateListener = () => void;
 
@@ -48,6 +50,16 @@ export interface EditorState {
   
   // Export
   sheetColumns: number;
+
+  // Atlas Packer / Pivot
+  /** Default origin for frames without a manual pick. */
+  pivotMode: PivotMode;
+  /** Click on a frame to place its origin. */
+  isPivotPicking: boolean;
+  /** Drop the transparent borders before packing. */
+  atlasTrim: boolean;
+  /** Alpha value above which a pixel counts as content while trimming. */
+  atlasAlphaThreshold: number;
   
   // Effects
   removeBackground: boolean;
@@ -82,6 +94,10 @@ const DEFAULT_STATE: EditorState = {
   zoom: 1,
   previewZoom: -1, // -1 means auto-fit
   sheetColumns: 8,
+  pivotMode: 'center',
+  isPivotPicking: false,
+  atlasTrim: true,
+  atlasAlphaThreshold: 0,
   removeBackground: false,
   removeBgColor: { r: 0, g: 0, b: 0, tolerance: 30 },
 };
@@ -156,6 +172,7 @@ export class EditorViewModel {
     this.state.frames = [];
     this.state.manualFrames = [];
     this.state.currentFrame = 0;
+    this.state.isPivotPicking = false;
     this.stopAnimation();
     this.notify();
   }
@@ -347,6 +364,79 @@ export class EditorViewModel {
   // Export settings
   setSheetColumns(columns: number): void {
     this.state.sheetColumns = Math.max(1, columns);
+    this.notify();
+  }
+
+  // Atlas packer & pivot
+  setPivotMode(mode: PivotMode): void {
+    this.state.pivotMode = mode;
+    this.notify();
+  }
+
+  togglePivotPicking(): void {
+    this.state.isPivotPicking = !this.state.isPivotPicking;
+    this.notify();
+  }
+
+  setAtlasTrim(enabled: boolean): void {
+    this.state.atlasTrim = enabled;
+    this.notify();
+  }
+
+  setAtlasAlphaThreshold(value: number): void {
+    this.state.atlasAlphaThreshold = Math.max(0, Math.min(255, value));
+    this.notify();
+  }
+
+  /**
+   * Store (or clear with null) the picked origin of a frame.
+   * `index` is the position inside getFrames(), grid frames first.
+   */
+  setFramePivot(index: number, pivot: Pivot | null): void {
+    const gridCount = this.state.frames.length;
+    const isManual = index >= gridCount;
+    const localIndex = isManual ? index - gridCount : index;
+    const list = isManual ? this.state.manualFrames : this.state.frames;
+
+    if (localIndex < 0 || localIndex >= list.length) return;
+
+    const updated = list.map((frame, i) => {
+      if (i !== localIndex) return frame;
+      const next = { ...frame };
+      if (pivot) {
+        next.pivot = normalizePivot(pivot);
+      } else {
+        delete next.pivot;
+      }
+      return next;
+    });
+
+    if (isManual) {
+      this.state.manualFrames = updated;
+    } else {
+      this.state.frames = updated;
+    }
+
+    if (pivot) {
+      this.state.pivotMode = 'custom';
+    }
+    this.notify();
+  }
+
+  /** Number of frames carrying a manually picked origin. */
+  getPickedPivotCount(): number {
+    return this.getFrames().filter(frame => frame.pivot !== undefined).length;
+  }
+
+  clearFramePivots(): void {
+    const strip = (frame: Frame): Frame => {
+      if (!frame.pivot) return frame;
+      const next = { ...frame };
+      delete next.pivot;
+      return next;
+    };
+    this.state.frames = this.state.frames.map(strip);
+    this.state.manualFrames = this.state.manualFrames.map(strip);
     this.notify();
   }
   

@@ -30,6 +30,8 @@ npm-debug.log*
 # Build outputs (if any)
 dist/
 build/
+coverage/
+tsconfig.tsbuildinfo
 
 # Environment files
 .env

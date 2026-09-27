@@ -1,6 +1,8 @@
 // Domain Layer - Pure logic, framework independent
 // Grid calculation formulas and frame management
 
+import type { Pivot } from './atlas/AtlasTypes';
+
 export interface Frame {
   x: number;
   y: number;
@@ -8,6 +10,8 @@ export interface Frame {
   h: number;
   index: number;
   isActive: boolean;
+  /** Normalized origin picked by the user, relative to the untrimmed frame. */
+  pivot?: Pivot;
 }
 
 export interface GridConfig {
