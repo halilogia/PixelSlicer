@@ -1,7 +1,7 @@
 # 🗺️ Roadmap - PixelSlicer
 
 > Only **future** work lives here. Everything already shipped is recorded in [CHANGELOG.md](CHANGELOG.md).
-> Current state: v2.3.0, 277 unit/component tests, 4 Playwright smoke tests, 35% line coverage.
+> Current state: v2.3.0, 279 unit/component tests, 4 Playwright smoke tests, 36% line coverage.
 
 ## 🎨 v2.4 — Atlas Packer Round Two
 

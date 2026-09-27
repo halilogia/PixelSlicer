@@ -17,7 +17,7 @@ All notable changes to the PixelSlicer project will be documented in this file.
 - `npm run test:e2e`: Playwright smoke tests in real Chromium — upload a generated fixture sheet, slice it, toggle a frame, build a trimmed atlas, download the atlas ZIP, and export the frame ZIP + animated GIF through the worker (4 tests, running in CI).
 - `npm run bench`: Vitest benchmarks for the atlas pipeline and the editor state at 100 / 500 / 1000 frames, with the baseline recorded in `docs/BENCHMARKS.md`.
 - `ExportPipeline`: the pixel and encoding half of the ZIP/GIF export, shared by the main thread and the worker.
-- Tests: 113 → **277**. `FrameLogic` 5.78% → 100%, `domain/video` 0% → 96%, `ExportService` 0% → 98%, `EditorViewModel` at 96%. Coverage now measures all of `src` with per area floors.
+- Tests: 113 → **279**. `FrameLogic` 5.78% → 100%, `domain/video` 0% → 96%, `ExportService` 0% → 98%, `EditorViewModel` at 96%. Coverage now measures all of `src` with per area floors.
 - React component tests on happy-dom for `useEditorSelector`, `GallerySection` and the object URL lifecycle of `useFrameThumbnails`.
 - A shimmer placeholder while thumbnails are still generating (respects `prefers-reduced-motion`).
 
