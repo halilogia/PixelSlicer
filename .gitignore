@@ -44,7 +44,8 @@ archive/
 Universal-Docs/
 .snapshots/
 .agent/
-assets/
+/assets/
+!src/assets/
 archives/
 archive/
 
